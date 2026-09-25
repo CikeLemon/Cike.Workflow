@@ -543,7 +543,16 @@ public class ActivityExecutionContext : IExecutionContext
             if (x.IsSerializable == false)
                 return "(not serializable)";
 
-            var cachedValue = expressionExecutionContext.GetOutput(activity.Id, x.Name);
+            // 活动在当前容器解析不到时（如根 Workflow 自身的执行记录，画布节点集中没有它），
+            // 寄存值无从取起，跳过缓存查询、直接走 ValueGetter 兜底
+            object? cachedValue = null;
+            try
+            {
+                cachedValue = expressionExecutionContext.GetOutput(activity.Id, x.Name);
+            }
+            catch (InvalidOperationException)
+            {
+            }
 
             if (cachedValue != null)
                 return cachedValue;

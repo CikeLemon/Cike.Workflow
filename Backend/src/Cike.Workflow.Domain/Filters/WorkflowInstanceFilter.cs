@@ -117,6 +117,11 @@ public class WorkflowInstanceFilter
     public bool? IsSystem { get; set; }
 
     /// <summary>
+    /// Filter on debug (trial) workflow instances.
+    /// </summary>
+    public bool? IsDebug { get; set; }
+
+    /// <summary>
     /// Filter workflow instances that are older than the specified timestamp.
     /// </summary>
     public DateTime? BeforeLastUpdated { get; set; }
@@ -157,6 +162,7 @@ public class WorkflowInstanceFilter
         if (filter.IsExecuting != null) query = query.Where(x => x.IsExecuting == filter.IsExecuting);
         if (filter.HasIncidents != null) query = filter.HasIncidents == true ? query.Where(x => x.IncidentCount > 0) : query.Where(x => x.IncidentCount == 0);
         if (filter.IsSystem != null) query = query.Where(x => x.IsSystem == filter.IsSystem);
+        if (filter.IsDebug != null) query = query.Where(x => x.IsDebug == filter.IsDebug);
         if (filter.Name != null) query = query.Where(x => x.Name!.ToLower().Contains(filter.Name.ToLower()));
         if (filter.BeforeLastUpdated != null) query = query.Where(x => x.UpdatedAt < filter.BeforeLastUpdated);
 

@@ -28,8 +28,9 @@ public class WorkflowInstanceManagerTest
     [Test]
     public async Task SaveAsync_WhenInstanceExists_DispatchesUpdate()
     {
-        _repository.AnyAsync(Arg.Any<Expression<Func<WorkflowInstance, bool>>>(), Arg.Any<CancellationToken>())
-            .Returns(true);
+        // 实现已改为 FindAsync 取已跟踪实体就地应用状态（避免同键 Attach 身份冲突）
+        _repository.FindAsync(42, Arg.Any<CancellationToken>())
+            .Returns(new WorkflowInstance { Id = 42 });
 
         await _manager.SaveAsync(new WorkflowState { Id = 42 }, CancellationToken.None);
 
@@ -40,8 +41,8 @@ public class WorkflowInstanceManagerTest
     [Test]
     public async Task SaveAsync_WhenInstanceNotExists_DispatchesInsert()
     {
-        _repository.AnyAsync(Arg.Any<Expression<Func<WorkflowInstance, bool>>>(), Arg.Any<CancellationToken>())
-            .Returns(false);
+        _repository.FindAsync(42, Arg.Any<CancellationToken>())
+            .Returns((WorkflowInstance?)null);
 
         await _manager.SaveAsync(new WorkflowState { Id = 42 }, CancellationToken.None);
 

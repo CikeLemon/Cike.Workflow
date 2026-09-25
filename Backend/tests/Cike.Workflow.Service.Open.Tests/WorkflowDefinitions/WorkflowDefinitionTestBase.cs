@@ -1,4 +1,7 @@
 using Cike.EntityFrameworkCore;
+using Cike.UniversalId.ULong;
+using Cike.Workflow.Core.Enums;
+using Cike.Workflow.Core.Runners.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -123,6 +126,60 @@ public abstract class WorkflowDefinitionTestBase : BaseIntegrationTest
     {
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException($"请求失败 [{(int)response.StatusCode}]: {await response.Content.ReadAsStringAsync()}");
+    }
+
+    /// <summary>
+    /// 直库播种工作流实例（门禁/守卫的证据，绕过引擎）。Created/Updated 一律取传入时间，
+    /// 传过去时间即可构造"调试证据已过期"场景；审计仅在 CreatedAt == default 时填充，显式值不会被覆盖。
+    /// </summary>
+    protected async Task<long> SeedInstanceAsync(string definitionId, long definitionVersionRowId, bool isDebug,
+        WorkflowStatus status, DateTime? createdAt = null)
+    {
+        using var scope = _rootServices.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<CikeWorkflowDbContext>();
+        var snowflake = scope.ServiceProvider.GetRequiredService<ISnowflakeIdGenerator>();
+        var time = createdAt ?? DateTime.Now;
+
+        var instance = new WorkflowInstance
+        {
+            Id = snowflake.NextId(),
+            DefinitionId = definitionId,
+            DefinitionVersionId = definitionVersionRowId,
+            Name = "seeded",
+            Status = status,
+            IsDebug = isDebug,
+            CreatedAt = time,
+            UpdatedAt = time,
+            WorkflowState = new WorkflowState
+            {
+                DefinitionId = definitionId,
+                DefinitionVersionId = definitionVersionRowId,
+                Status = status,
+                CreatedAt = time,
+                UpdatedAt = time,
+            },
+        };
+        instance.WorkflowState.Id = instance.Id;
+
+        dbContext.WorkflowInstances.Add(instance);
+        await dbContext.SaveChangesAsync();
+        await dbContext.Database.CurrentTransaction!.CommitAsync();
+        return instance.Id;
+    }
+
+    /// <summary>轮询探针直到返回非空（引擎路径经后台事件异步推进，断言前轮询等待）。</summary>
+    protected static async Task<T> WaitUntilAsync<T>(Func<Task<T?>> probe, TimeSpan? timeout = null) where T : class
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
+        while (DateTime.UtcNow < deadline)
+        {
+            var result = await probe();
+            if (result != null)
+                return result;
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException("条件在超时时间内未满足。");
     }
 
     /// <summary>框架将 long 序列化为字符串，统一按字符串读取再解析。</summary>

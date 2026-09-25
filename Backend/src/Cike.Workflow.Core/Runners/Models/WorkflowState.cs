@@ -30,6 +30,9 @@ public class WorkflowState
 
     public bool IsSystem { get; set; }
 
+    /// <summary>调试实例标记：对草稿版本行发起的试运行。</summary>
+    public bool IsDebug { get; set; }
+
     public ICollection<CompletionCallbackState> CompletionCallbacks { get; set; } = new List<CompletionCallbackState>();
 
     [NotMapped]

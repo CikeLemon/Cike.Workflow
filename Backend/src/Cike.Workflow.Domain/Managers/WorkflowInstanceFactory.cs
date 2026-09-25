@@ -25,7 +25,8 @@ public class WorkflowInstanceFactory(ISnowflakeIdGenerator identityGenerator) : 
             CreatedAt = now,
             UpdatedAt = now,
             ParentWorkflowInstanceId = options?.ParentWorkflowInstanceId,
-            IsSystem = workflow.IsSystem
+            IsSystem = workflow.IsSystem,
+            IsDebug = options?.IsDebug ?? false
         };
     }
 
@@ -46,6 +47,7 @@ public class WorkflowInstanceFactory(ISnowflakeIdGenerator identityGenerator) : 
             Status = workflowState.Status,
             IncidentCount = workflowState.Incidents.Count,
             IsSystem = workflowState.IsSystem,
+            IsDebug = workflowState.IsDebug,
             CreatedAt = workflowState.CreatedAt,
             UpdatedAt = workflowState.UpdatedAt,
             FinishedAt = workflowState.FinishedAt ?? default,

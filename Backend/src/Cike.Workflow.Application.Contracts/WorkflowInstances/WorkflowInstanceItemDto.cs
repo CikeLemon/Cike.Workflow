@@ -20,6 +20,8 @@ public class WorkflowInstanceItemDto : AuditedEntityDto<long>
 
     public bool IsExecuting { get; set; }
 
+    public bool IsDebug { get; set; }
+
     public int IncidentCount { get; set; }
 
     public WorkflowStatus Status { get; set; }

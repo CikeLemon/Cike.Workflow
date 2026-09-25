@@ -41,6 +41,7 @@ public class WorkflowStateMapper : ISingletonDependency
         target.FinishedAt = source.FinishedAt ?? default;
         target.WorkflowState = source;
         target.IsSystem = source.IsSystem;
+        target.IsDebug = source.IsDebug;
     }
 
     /// <summary>
@@ -65,6 +66,7 @@ public class WorkflowStateMapper : ISingletonDependency
         workflowState.UpdatedAt = source.UpdatedAt;
         workflowState.FinishedAt = source.FinishedAt;
         workflowState.IsSystem = source.IsSystem;
+        workflowState.IsDebug = source.IsDebug;
 
         return workflowState;
     }

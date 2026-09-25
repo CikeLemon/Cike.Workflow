@@ -226,6 +226,9 @@ public class WorkflowExecutionContext : IExecutionContext
 
     public bool IsExecuting { get; set; }
 
+    /// <summary>调试实例标记：由 WorkflowState 还原 / 回写，活动执行期可读。</summary>
+    public bool IsDebug { get; set; }
+
     public ICollection<ActivityIncident> Incidents { get; set; }
 
     public ICollection<Bookmark> OriginalBookmarks { get; set; }

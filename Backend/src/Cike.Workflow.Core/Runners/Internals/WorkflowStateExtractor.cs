@@ -27,6 +27,7 @@ public class WorkflowStateExtractor(ILogger<WorkflowStateExtractor> logger) : IW
             Output = workflowExecutionContext.Output,
             Incidents = workflowExecutionContext.Incidents,
             IsSystem = workflowExecutionContext.WorkflowGraph.Workflow.IsSystem,
+            IsDebug = workflowExecutionContext.IsDebug,
             CreatedAt = workflowExecutionContext.CreatedAt,
             UpdatedAt = workflowExecutionContext.UpdatedAt,
             FinishedAt = workflowExecutionContext.FinishedAt,
@@ -48,6 +49,7 @@ public class WorkflowStateExtractor(ILogger<WorkflowStateExtractor> logger) : IW
         workflowExecutionContext.Name = state.Name;
         workflowExecutionContext.ParentWorkflowInstanceId = state.ParentWorkflowInstanceId;
         workflowExecutionContext.IsExecuting = state.IsExecuting;
+        workflowExecutionContext.IsDebug = state.IsDebug;
         workflowExecutionContext.Status = state.Status;
         workflowExecutionContext.Bookmarks = state.Bookmarks;
         workflowExecutionContext.Output = state.Output;

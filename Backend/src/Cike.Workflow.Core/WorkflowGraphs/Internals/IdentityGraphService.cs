@@ -61,6 +61,18 @@ public class IdentityGraphService(IActivityVisitor activityVisitor, IActivityReg
                 blockReference.Id = $"{activity.Id}:input-{inputName.Humanize().Kebaberize()}";
         }
 
+        // 画布反序列化的活动不携带 Output 实例（属性声明为 null!）：图构建期补齐默认实例，
+        // 否则执行期 context.Set / 目标类型读取会空引用
+        foreach (var outputProperty in activity.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (!typeof(Output).IsAssignableFrom(outputProperty.PropertyType) || !outputProperty.CanWrite)
+                continue;
+
+            if (outputProperty.GetValue(activity) == null
+                && Activator.CreateInstance(outputProperty.PropertyType) is Output outputInstance)
+                outputProperty.SetValue(activity, outputInstance);
+        }
+
         var outputs = activity.GetOutputs();
 
         foreach (var output in outputs)

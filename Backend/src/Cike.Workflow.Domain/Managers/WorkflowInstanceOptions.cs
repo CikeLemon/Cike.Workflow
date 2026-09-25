@@ -34,4 +34,9 @@ public class WorkflowInstanceOptions
     /// The ID of the parent workflow instance, if any.
     /// </summary>
     public long? ParentWorkflowInstanceId { get; set; }
+
+    /// <summary>
+    /// Marks the instance as a debug (trial) run against a draft definition version.
+    /// </summary>
+    public bool IsDebug { get; set; }
 }

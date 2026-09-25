@@ -9,6 +9,9 @@ public class WorkflowInstanceQueryHandler(IWorkflowInstanceRepository workflowIn
     [LocalEventHandler]
     public async Task GetPagedListAsync(GetPagedWorkflowInstanceListQuery query, CancellationToken cancellationToken = default)
     {
+        // 列表默认隐藏调试实例（试跑记录不是生产行为），要看时显式传 IsDebug 过滤
+        query.Filter.IsDebug ??= false;
+
         // 先校验时间戳过滤列白名单，把非法列转成业务 400，而不是落到 Apply() 里的原始 ArgumentException（500）
         var timestampErrors = WorkflowInstanceFilter.ValidateTimestampFilters(query.Filter.TimestampFilters).ToList();
         if (timestampErrors.Count > 0)
@@ -25,6 +28,24 @@ public class WorkflowInstanceQueryHandler(IWorkflowInstanceRepository workflowIn
             Total = total,
             Items = dtos
         };
+    }
+
+    [LocalEventHandler]
+    public async Task GetDebugRunsAsync(GetWorkflowDebugRunsQuery query, CancellationToken cancellationToken = default)
+    {
+        var instances = await workflowInstanceRepository.FindManyAsync(new WorkflowInstanceFilter
+        {
+            DefinitionVersionId = query.DefinitionVersionId,
+            IsDebug = true,
+        }, cancellationToken);
+
+        var dtos = instances
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(20)
+            .Adapt<List<WorkflowInstanceItemDto>>();
+        await FillDefinitionNamesAsync(dtos, cancellationToken);
+
+        query.Result = dtos;
     }
 
     [LocalEventHandler]

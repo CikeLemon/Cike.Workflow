@@ -1,17 +1,22 @@
+using Cike.Workflow.Core.Serialization;
+
 namespace Cike.Workflow.Domain.Materializers.Mappers;
 
 public class WorkflowDefinitionMapper : ISingletonDependency
 {
     private readonly VariableDefinitionMapper _variableDefinitionMapper;
+    private readonly IActivitySerializer _activitySerializer;
 
-    public WorkflowDefinitionMapper(VariableDefinitionMapper variableDefinitionMapper)
+    public WorkflowDefinitionMapper(VariableDefinitionMapper variableDefinitionMapper, IActivitySerializer activitySerializer)
     {
         _variableDefinitionMapper = variableDefinitionMapper;
+        _activitySerializer = activitySerializer;
     }
 
     public WorkflowActivity Map(WorkflowDefinition source)
     {
-        var root = JsonHelper.Deserialize<Activity>(source.OriginalStringData!);
+        // 画布内容经 IActivitySerializer 多态反序列化（与序列化对称）；裸 JsonHelper 无法反序列化抽象 Activity
+        var root = _activitySerializer.Deserialize<IActivity>(source.OriginalStringData!);
 
         var variables = source.Options?.Variables?.Select(v => _variableDefinitionMapper.Map(v)).Where(e => e != null).ToList() ?? new List<Core.Variables.Variable>();
 

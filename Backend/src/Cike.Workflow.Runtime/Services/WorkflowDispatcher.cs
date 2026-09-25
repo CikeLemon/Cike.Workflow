@@ -43,6 +43,7 @@ internal class WorkflowDispatcher(ILocalEventBus localEventBus, IWorkflowRuntime
             Properties = command.Request.Properties,
             ParentId = command.Request.ParentWorkflowInstanceId,
             TriggerActivityId = command.Request.TriggerActivityId,
+            IsDebug = command.Request.IsDebug,
             SchedulingActivityExecutionId = command.Request.SchedulingActivityExecutionId,
             SchedulingWorkflowInstanceId = command.Request.SchedulingWorkflowInstanceId,
             SchedulingCallStackDepth = command.Request.SchedulingCallStackDepth

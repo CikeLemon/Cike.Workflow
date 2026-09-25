@@ -25,10 +25,18 @@ internal class WorkflowDefinitionPublishTest : WorkflowDefinitionTestBase
         return (definitionId, rowId);
     }
 
+    /// <summary>建草稿 + 播种新鲜的调试成功证据（发布门禁要求），返回 (definitionId, rowId)。</summary>
+    private async Task<(string DefinitionId, long RowId)> PrepareDebuggedDraftAsync()
+    {
+        var (definitionId, rowId) = await PrepareAsync();
+        await SeedInstanceAsync(definitionId, rowId, isDebug: true, Core.Enums.WorkflowStatus.Finished, DateTime.Now.AddMinutes(1));
+        return (definitionId, rowId);
+    }
+
     [Test]
     public async Task PublishAsync_携带画布直接发布_落库内容与提交画布一致且打发布标记()
     {
-        var (definitionId, rowId) = await PrepareAsync();
+        var (definitionId, rowId) = await PrepareDebuggedDraftAsync();
 
         var response = await PostPublishCanvasAsync(rowId, "首个正式版本");
 
@@ -53,7 +61,7 @@ internal class WorkflowDefinitionPublishTest : WorkflowDefinitionTestBase
     [Test]
     public async Task PublishAsync_携带变量选项_变量定义随发布落库()
     {
-        var (definitionId, rowId) = await PrepareAsync();
+        var (definitionId, rowId) = await PrepareDebuggedDraftAsync();
         var variables = new object[]
         {
             new { id = "var1", name = "count", typeName = "Int32", isArray = false },
@@ -175,6 +183,24 @@ internal class WorkflowDefinitionPublishTest : WorkflowDefinitionTestBase
     }
 
     [Test]
+    public async Task PublishAsync_最新行已是发布态_返回400要求先保存草稿()
+    {
+        var (definitionId, rowId) = await PrepareDebuggedDraftAsync();
+        await EnsureSuccessAsync(await PostPublishCanvasAsync(rowId));
+        var firstId = await GetVersionRowIdAsync(definitionId, 1);
+
+        var response = await PostPublishCanvasAsync(rowId, "第二版");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("没有待发布的草稿"));
+
+        // 版本行未增长
+        var versions = await GetVersionListAsync(definitionId);
+        Assert.That(versions, Has.Count.EqualTo(1));
+        Assert.That(await GetVersionRowIdAsync(definitionId, 1), Is.EqualTo(firstId));
+    }
+
+    [Test]
     public async Task PublishAsync_校验失败_落库内容保持不变且未打发布标记()
     {
         var (_, rowId) = await PrepareAsync();
@@ -197,36 +223,19 @@ internal class WorkflowDefinitionPublishTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task PublishAsync_最新行已是发布态_生成新草稿版本并直接发布()
-    {
-        var (definitionId, rowId) = await PrepareAsync();
-        await EnsureSuccessAsync(await PostPublishCanvasAsync(rowId));
-        var firstId = await GetVersionRowIdAsync(definitionId, 1);
-
-        var response = await PostPublishCanvasAsync(rowId, "第二版");
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-        var secondId = await ReadLongAsync(response);
-        Assert.That(secondId, Is.Not.EqualTo(firstId));
-        Assert.That(secondId, Is.EqualTo(await GetVersionRowIdAsync(definitionId, 2)));
-
-        var versions = await GetVersionListAsync(definitionId);
-        Assert.That(versions, Has.Count.EqualTo(2));
-        Assert.That(versions.All(x => GetBool(x, "isPublished")), Is.True);
-        // IsLatest 转移到新版本行
-        Assert.That(GetBool(versions[0], "isLatest"), Is.True);
-        Assert.That(GetBool(versions[1], "isLatest"), Is.False);
-        Assert.That(GetString(versions[0], "publishedNote"), Is.EqualTo("第二版"));
-        Assert.That(GetInt(versions[0], "version"), Is.EqualTo(2));
-    }
-
-    [Test]
     public async Task PublishAsync_后续发布_历史版本发布标记保留()
     {
-        var (definitionId, rowId) = await PrepareAsync();
+        var (definitionId, rowId) = await PrepareDebuggedDraftAsync();
         await EnsureSuccessAsync(await PostPublishCanvasAsync(rowId, "v1", prefix: "hist"));
-        await EnsureSuccessAsync(await PostPublishCanvasAsync(rowId, "v2", prefix: "hist2"));
+        // 第二次发布前：保存生成 v2 草稿并播种新的调试证据
+        await EnsureSuccessAsync(await CreateClient().PostAsJsonAsync($"/api/v1/WorkflowDefinitions/Save/{rowId}",
+            new { root = CreateValidCanvas("hist2") }));
+        var secondRowId = await GetVersionRowIdAsync(definitionId, 2);
+        await SeedInstanceAsync(definitionId, secondRowId, isDebug: true, Core.Enums.WorkflowStatus.Finished, DateTime.Now.AddMinutes(1));
 
+        var response = await PostPublishCanvasAsync(rowId, "v2", prefix: "hist2");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         var versions = await GetVersionListAsync(definitionId);
         Assert.That(versions, Has.Count.EqualTo(2));
         Assert.That(versions.All(x => GetBool(x, "isPublished")), Is.True);

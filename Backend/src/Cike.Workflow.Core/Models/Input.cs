@@ -48,6 +48,8 @@ public class Input<T> : Input
     {
     }
 
+    /// <summary>JSON 反序列化专用构造：Expression 为只读属性，须经构造器绑定画布里的表达式与内存块引用。</summary>
+    [JsonConstructor]
     public Input(Expression expression, MemoryBlockReference memoryBlockReference) : base(expression, memoryBlockReference, typeof(T))
     {
     }

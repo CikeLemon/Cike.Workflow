@@ -20,6 +20,8 @@ public class CreateAndRunWorkflowInstanceRequest
 
     public long? ParentId { get; set; }
 
+    public bool IsDebug { get; set; }
+
     public string? TriggerActivityId { get; set; }
 
     public ActivityHandle? ActivityHandle { get; set; }

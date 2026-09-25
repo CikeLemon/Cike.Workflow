@@ -1,5 +1,6 @@
 using Cike.Caching;
 using Cike.Data.EFCore;
+using Cike.Locks.Abstracts;
 using Cike.Workflow.Caching;
 using Cike.Workflow.Service.Open.Tests.Infrastructure;
 using Cike.EntityFrameworkCore;
@@ -52,6 +53,8 @@ public abstract class BaseIntegrationTest : IDisposable
                   services.Replace(ServiceDescriptor.Singleton(typeof(ICacheService<>), typeof(InMemoryCacheService<>)));
                   // 定义运行时缓存的真实实现跑在此内存介质上（不依赖 Redis），键/索引/选取逻辑被真实执行
                   services.Replace(ServiceDescriptor.Singleton<IMultilevelCacheClient, InMemoryMultilevelCacheClient>());
+                  // 分布式锁以进程内信号量替身接管（不依赖 Redis），锁的获取/互斥/释放语义被真实执行
+                  services.Replace(ServiceDescriptor.Singleton<ILock, TestLocalLock>());
               });
           });
 

@@ -87,6 +87,7 @@ internal class WorkflowClient(
             Input = request.Input,
             Properties = request.Properties,
             ParentWorkflowInstanceId = request.ParentId,
+            IsDebug = request.IsDebug,
         };
 
         var workflowInstance = await workflowInstanceManager.CreateAndCommitWorkflowInstanceAsync(workflowGraph.Workflow, instanceOptions, cancellationToken);

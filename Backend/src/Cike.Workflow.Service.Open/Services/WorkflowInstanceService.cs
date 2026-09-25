@@ -2,6 +2,7 @@ using Cike.AspNetCore.MinimalAPIs.EndpointFilters;
 using Cike.Contracts.EntityDtos;
 using Cike.EventBus.Local;
 using Cike.Workflow.Application.Contracts.WorkflowInstances;
+using Cike.Workflow.Application.WorkflowInstances.Commands;
 using Cike.Workflow.Application.WorkflowInstances.Queries;
 using Cike.Workflow.Core.Contexts.Models;
 using Cike.Workflow.Domain.Filters;
@@ -36,6 +37,32 @@ public class WorkflowInstanceService : MinimalApiServiceBase
         CancellationToken cancellationToken = default)
     {
         var query = new GetWorkflowInstanceQuery(id);
+        await localEventBus.PublishAsync(query, cancellationToken);
+        return TypedResults.Ok(query.Result);
+    }
+
+    /// <summary>
+    /// 对草稿版本行发起调试（试跑）：从开始节点启动，实例标记 IsDebug。
+    /// 返回预生成的实例 Id，实例由后台异步创建，调用方轮询详情获取执行状态。
+    /// </summary>
+    public async Task<Results<Ok<long>, BadRequest>> PostDebugRunAsync(
+        [FromServices] ILocalEventBus localEventBus,
+        long id,
+        RunDebugWorkflowDto? dto,
+        CancellationToken cancellationToken = default)
+    {
+        var command = new RunDebugWorkflowCommand(id, dto?.Input);
+        await localEventBus.PublishAsync(command, cancellationToken);
+        return TypedResults.Ok(command.WorkflowInstanceId);
+    }
+
+    /// <summary>查某草稿版本行的调试记录（调试实例），按创建时间倒序。</summary>
+    public async Task<Results<Ok<List<WorkflowInstanceItemDto>>, BadRequest>> GetDebugRunsAsync(
+        [FromServices] ILocalEventBus localEventBus,
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new GetWorkflowDebugRunsQuery(id);
         await localEventBus.PublishAsync(query, cancellationToken);
         return TypedResults.Ok(query.Result);
     }

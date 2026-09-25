@@ -1,8 +1,10 @@
 using Cike.Workflow.Common.Versions;
 using Cike.Workflow.Core.Activities.FlowchartActivity;
 using Cike.Workflow.Core.Activities.FlowchartActivity.Models;
+using Cike.Workflow.Core.Enums;
 using Cike.Workflow.Core.Serialization;
 using Cike.Workflow.Core.Validation;
+using Cike.Workflow.Domain.Managers;
 
 namespace Cike.Workflow.Application.WorkflowDefinitions;
 
@@ -13,7 +15,9 @@ public class WorkflowDefinitionCommandHandler(
     IDistributedCacheClient distributedCacheClient,
     IActivitySerializer activitySerializer,
     ICurrentUser currentUser,
-    IWorkflowValidator workflowValidator)
+    IWorkflowValidator workflowValidator,
+    ILock lockService,
+    WorkflowDebugRunGuard debugRunGuard)
 {
     private const string DefinitionIdSeqKey = "cike:workflow:workflow-definition:code:seq";
 
@@ -69,9 +73,16 @@ public class WorkflowDefinitionCommandHandler(
         if (entity.IsReadonly)
             throw new UserFriendlyException("只读工作流不允许保存。");
 
+        var data = activitySerializer.Serialize(command.Dto.Root);
+
+        await using var handle = await AcquireDefinitionLockAsync(entity.DefinitionId, cancellationToken);
+
         var latest = await GetLatestAsync(entity.DefinitionId, cancellationToken);
 
-        var data = activitySerializer.Serialize(command.Dto.Root);
+        // 调试锁定：保存会就地覆盖草稿内容，草稿上还有未终态调试实例时拒绝
+        if (!latest.IsPublished)
+            await debugRunGuard.EnsureNoActiveDebugRunAsync(latest.DefinitionId, latest.Id, cancellationToken);
+
         var row = await PersistDraftAsync(latest, data, command.Dto.Options, null, cancellationToken);
         command.DraftId = row.Id;
     }
@@ -83,6 +94,11 @@ public class WorkflowDefinitionCommandHandler(
 
         if (entity.IsSystem)
             throw new UserFriendlyException("系统内置工作流不允许删除。");
+
+        await using var handle = await AcquireDefinitionLockAsync(entity.DefinitionId, cancellationToken);
+
+        // 删除禁令：定义下存在任何未终态实例（含调试实例）时不允许删除
+        await debugRunGuard.EnsureNoRunningInstanceAsync(entity.DefinitionId, cancellationToken);
 
         // 仓储内跟踪物化后批量软删（软删 + 按版本清理运行时缓存都在仓储覆写口完成）
         await workflowDefinitionRepository.DeleteVersionsAsync(entity.DefinitionId, cancellationToken);
@@ -96,8 +112,6 @@ public class WorkflowDefinitionCommandHandler(
         if (entity.IsSystem)
             throw new UserFriendlyException("系统内置工作流不允许发布。");
 
-        var latest = await GetLatestAsync(entity.DefinitionId, cancellationToken);
-
         // 先校验后写库：严格画布校验全部通过才允许落库（Core 层 WorkflowValidator），失败时零写入
         var data = activitySerializer.Serialize(command.Root);
         var variables = command.Options.Variables
@@ -106,6 +120,22 @@ public class WorkflowDefinitionCommandHandler(
         var errors = workflowValidator.Validate(new WorkflowValidationContext(command.Root, variables));
         if (errors.Count > 0)
             throw new UserFriendlyException(string.Join("；", errors.Select(x => x.Message)));
+
+        await using var handle = await AcquireDefinitionLockAsync(entity.DefinitionId, cancellationToken);
+
+        var latest = await GetLatestAsync(entity.DefinitionId, cancellationToken);
+
+        // 发布门禁：只允许发布草稿行，且草稿行最新一次调试已成功并晚于内容变更（保证"发布即所调"）
+        if (latest.IsPublished)
+            throw new UserFriendlyException("当前没有待发布的草稿，请先保存草稿并调试成功后再发布。");
+
+        var debugRun = await debugRunGuard.FindLatestDebugRunAsync(latest.DefinitionId, latest.Id, cancellationToken);
+        if (debugRun is null)
+            throw new UserFriendlyException("该草稿尚未调试，请先完成一次调试运行再发布。");
+        if (debugRun.Status != WorkflowStatus.Finished)
+            throw new UserFriendlyException("最近一次调试未成功，请重新调试通过后再发布。");
+        if (debugRun.CreatedAt < latest.UpdatedAt)
+            throw new UserFriendlyException("草稿在最近一次调试后已有变更，请重新调试通过后再发布。");
 
         var note = command.PublishedNote ?? string.Empty;
         var row = await PersistDraftAsync(latest, data, command.Options, row =>
@@ -152,6 +182,8 @@ public class WorkflowDefinitionCommandHandler(
         if (target.IsReadonly)
             throw new UserFriendlyException("只读工作流不允许回滚。");
 
+        await using var handle = await AcquireDefinitionLockAsync(target.DefinitionId, cancellationToken);
+
         var latest = await GetLatestAsync(target.DefinitionId, cancellationToken);
 
         if (latest.Id == target.Id)
@@ -159,6 +191,9 @@ public class WorkflowDefinitionCommandHandler(
 
         if (!latest.IsPublished)
         {
+            // 调试锁定：回滚会就地覆盖草稿内容，草稿上还有未终态调试实例时拒绝
+            await debugRunGuard.EnsureNoActiveDebugRunAsync(latest.DefinitionId, latest.Id, cancellationToken);
+
             // 有未发布草稿：用目标版本的画布内容覆盖草稿，版本号不变（原草稿内容丢弃——已接受的取舍）
             latest.OriginalStringData = target.OriginalStringData;
             latest.Options = target.Options;
@@ -191,6 +226,16 @@ public class WorkflowDefinitionCommandHandler(
     {
         return await workflowDefinitionRepository.FindAsync(id, cancellationToken)
             ?? throw new UserFriendlyException("工作流定义不存在，请检查后重试。");
+    }
+
+    /// <summary>
+    /// 定义级短锁（30 分钟等待上限，仅作操作间互斥的安全阀）：
+    /// 串行化"检查调试状态 → 变更内容"的临界区；获取失败说明有并发操作长时间未释放，按冲突拒绝。
+    /// </summary>
+    private async Task<IAsyncDisposable> AcquireDefinitionLockAsync(string definitionId, CancellationToken cancellationToken = default)
+    {
+        var handle = await lockService.TryGetAsync(WorkflowDefinitionLock.GetKey(definitionId), WorkflowDefinitionLock.Timeout, cancellationToken);
+        return handle ?? throw new UserFriendlyException("当前有其他操作正在进行，请稍后重试。");
     }
 
     /// <summary>

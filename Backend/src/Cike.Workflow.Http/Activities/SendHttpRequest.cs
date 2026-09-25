@@ -187,6 +187,10 @@ namespace Cike.Workflow.Http.Activities
                 request.Headers.TryAddWithoutValidation("X-Beaver-Activity-Instance-Id", context.Id.ToString());
             }
 
+            // 调试（试跑）实例的出站请求统一打标，由下游服务自行识别处置
+            if (context.WorkflowExecutionContext.IsDebug)
+                request.Headers.TryAddWithoutValidation("isDebug", "true");
+
             return request;
         }
 

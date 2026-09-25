@@ -25,6 +25,8 @@ public class DispatchWorkflowDefinitionRequest
 
     public string? TriggerActivityId { get; set; }
 
+    public bool IsDebug { get; set; }
+
     public long? SchedulingActivityExecutionId { get; set; }
 
     public long? SchedulingWorkflowInstanceId { get; set; }

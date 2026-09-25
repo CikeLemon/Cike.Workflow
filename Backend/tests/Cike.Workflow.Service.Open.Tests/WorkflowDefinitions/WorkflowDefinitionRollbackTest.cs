@@ -1,4 +1,5 @@
 using System.Net;
+using Cike.Workflow.Core.Enums;
 
 namespace Cike.Workflow.Service.Open.Tests.WorkflowDefinitions;
 
@@ -15,8 +16,14 @@ internal class WorkflowDefinitionRollbackTest : WorkflowDefinitionTestBase
         return await ReadLongAsync(response);
     }
 
-    private async Task PublishAsync(long id, string prefix)
-        => await EnsureSuccessAsync(await PostPublishAsync(id, new { root = CreateValidCanvas(prefix), publishedNote = "发布" }));
+    /// <summary>发布前先给最新草稿行播种新鲜的调试成功证据（发布门禁要求），再走发布端点。</summary>
+    private async Task PublishAsync(string definitionId, long id, string prefix)
+    {
+        var versions = await GetVersionListAsync(definitionId);
+        var latestRowId = GetLong(versions[0], "id");
+        await SeedInstanceAsync(definitionId, latestRowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddMinutes(1));
+        await EnsureSuccessAsync(await PostPublishAsync(id, new { root = CreateValidCanvas(prefix), publishedNote = "发布" }));
+    }
 
     private async Task<(string DefinitionId, long RowId)> PrepareAsync()
     {
@@ -32,7 +39,7 @@ internal class WorkflowDefinitionRollbackTest : WorkflowDefinitionTestBase
         var (definitionId, rowId) = await PrepareAsync();
         // v1 保存并发布 → v2 草稿（内容 rb2）
         await SaveAsync(rowId, "rb1");
-        await PublishAsync(rowId, "rb1");
+        await PublishAsync(definitionId, rowId, "rb1");
         await SaveAsync(rowId, "rb2");
 
         var response = await PostRollbackAsync(definitionId, rowId);
@@ -57,9 +64,9 @@ internal class WorkflowDefinitionRollbackTest : WorkflowDefinitionTestBase
         var (definitionId, rowId) = await PrepareAsync();
         // v1 发布（rb1）→ v2（rb2）发布 → 最新为已发布 v2，无草稿
         await SaveAsync(rowId, "rb1");
-        await PublishAsync(rowId, "rb1");
+        await PublishAsync(definitionId, rowId, "rb1");
         await SaveAsync(rowId, "rb2");
-        await PublishAsync(rowId, "rb2");
+        await PublishAsync(definitionId, rowId, "rb2");
 
         var response = await PostRollbackAsync(definitionId, rowId);
 
@@ -91,7 +98,7 @@ internal class WorkflowDefinitionRollbackTest : WorkflowDefinitionTestBase
     {
         var (definitionId, rowId) = await PrepareAsync();
         await SaveAsync(rowId, "rb1");
-        await PublishAsync(rowId, "rb1");
+        await PublishAsync(definitionId, rowId, "rb1");
         var draftId = await SaveAsync(rowId, "rb2");
         // v2 草稿期间改名（元数据走已有 Update 命令，作用于草稿行）
         await EnsureSuccessAsync(await CreateClient().PutAsJsonAsync($"/api/v1/WorkflowDefinitions/{draftId}", new
@@ -126,7 +133,7 @@ internal class WorkflowDefinitionRollbackTest : WorkflowDefinitionTestBase
     {
         var (definitionId, rowId) = await PrepareAsync();
         await SaveAsync(rowId, "nb");
-        await PublishAsync(rowId, "nb");
+        await PublishAsync(definitionId, rowId, "nb");
         await SaveAsync(rowId, "nb2");
 
         var response = await PostRollbackAsync(definitionId, 999_999);
@@ -140,7 +147,7 @@ internal class WorkflowDefinitionRollbackTest : WorkflowDefinitionTestBase
     {
         var (definitionId, rowId) = await PrepareAsync();
         await SaveAsync(rowId, "own");
-        await PublishAsync(rowId, "own");
+        await PublishAsync(definitionId, rowId, "own");
         await SaveAsync(rowId, "own2");
         // 另一个定义的版本行
         var otherDefinitionId = $"WF_{Guid.NewGuid():N}";
@@ -157,7 +164,7 @@ internal class WorkflowDefinitionRollbackTest : WorkflowDefinitionTestBase
     {
         var (definitionId, rowId) = await PrepareAsync();
         await SaveAsync(rowId, "sys");
-        await PublishAsync(rowId, "sys");
+        await PublishAsync(definitionId, rowId, "sys");
         await SaveAsync(rowId, "sys2");
         await SeedDefinitionAsync(definitionId, e => e.IsSystem = true);
 
@@ -172,7 +179,7 @@ internal class WorkflowDefinitionRollbackTest : WorkflowDefinitionTestBase
     {
         var (definitionId, rowId) = await PrepareAsync();
         await SaveAsync(rowId, "ro");
-        await PublishAsync(rowId, "ro");
+        await PublishAsync(definitionId, rowId, "ro");
         await SaveAsync(rowId, "ro2");
         await SeedDefinitionAsync(definitionId, e => e.IsReadonly = true);
 
