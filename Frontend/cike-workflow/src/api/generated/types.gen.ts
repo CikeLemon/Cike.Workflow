@@ -264,6 +264,12 @@ export type RollbackWorkflowDefinitionDto = {
     definitionVersionId?: string;
 };
 
+export type RunDebugWorkflowDto = {
+    input?: {
+        [key: string]: unknown;
+    } | null;
+};
+
 export type SaveWorkflowDefinitionDto = {
     root?: IActivity;
     options?: WorkflowDefinitionOptionsValueObject;
@@ -461,6 +467,7 @@ export type WorkflowInstanceFilter = {
     isExecuting?: boolean | null;
     hasIncidents?: boolean | null;
     isSystem?: boolean | null;
+    isDebug?: boolean | null;
     beforeLastUpdated?: string | null;
     timestampFilters?: Array<TimestampFilter> | null;
     names?: Array<string> | null;
@@ -480,6 +487,7 @@ export type WorkflowInstanceItemDto = {
     name?: string;
     correlationId?: string;
     isExecuting?: boolean;
+    isDebug?: boolean;
     incidentCount?: number;
     status?: WorkflowStatus;
     finishedAt?: string;
@@ -508,6 +516,7 @@ export type WorkflowState = {
     bookmarks?: Array<Bookmark>;
     incidents?: Array<ActivityIncident>;
     isSystem?: boolean;
+    isDebug?: boolean;
     completionCallbacks?: Array<CompletionCallbackState>;
     activityExecutionContexts?: Array<ActivityExecutionContextState>;
     scheduledActivities?: Array<ActivityWorkItemState>;
@@ -1086,6 +1095,31 @@ export type GetApiV1WorkflowInstancesByIdResponses = {
 };
 
 export type GetApiV1WorkflowInstancesByIdResponse = GetApiV1WorkflowInstancesByIdResponses[keyof GetApiV1WorkflowInstancesByIdResponses];
+
+export type PostApiV1WorkflowInstancesDebugRunByIdData = {
+    body?: RunDebugWorkflowDto;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/WorkflowInstances/DebugRun/{id}';
+};
+
+export type PostApiV1WorkflowInstancesDebugRunByIdErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+};
+
+export type PostApiV1WorkflowInstancesDebugRunByIdResponses = {
+    /**
+     * OK
+     */
+    200: string;
+};
+
+export type PostApiV1WorkflowInstancesDebugRunByIdResponse = PostApiV1WorkflowInstancesDebugRunByIdResponses[keyof PostApiV1WorkflowInstancesDebugRunByIdResponses];
 
 export type GetApiV1WorkflowInstancesLogsByIdData = {
     body?: never;

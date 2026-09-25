@@ -10,6 +10,7 @@ import {
   postApiV1WorkflowDefinitionsRollback,
   postApiV1WorkflowDefinitionsSaveById,
   postApiV1WorkflowDefinitionsValidateCanvas,
+  postApiV1WorkflowInstancesDebugRunById,
 } from "@/api/generated"
 import type { WorkflowCanvasValidationErrorDto, WorkflowDefinitionType, WorkflowDefinitionVersionItemDto } from "@/api/generated"
 import type { Activity, IActivity } from "@/core/abstracts/Activity"
@@ -37,6 +38,7 @@ import { fromWireActivity, toWireActivity, type WireActivity } from "@/core/desi
 import { computeNodeId } from "@/core/designer/nodeId"
 import { getCanvasState, setCanvasState, type DesignerCanvasMeta } from "@/core/designer/metadata"
 import { cascadeRename, type ReferenceKind } from "@/core/designer/rename"
+import { extractApiErrorMessage } from "@/lib/apiError"
 
 /** One drill-down level: the container owning the canvas content. */
 export interface DrillEntry {
@@ -82,6 +84,8 @@ export function useWorkflowDesigner() {
   const versions = shallowRef<WorkflowDefinitionVersionItemDto[]>([])
   /** Historic (non-latest) versions are frozen: canvas is view-only. */
   const readonly = computed(() => !isLatest.value)
+  /** Debug requires a draft latest version (published rows are rejected by backend). */
+  const canDebug = computed(() => isLatest.value && !isPublished.value)
   const drillStack = shallowRef<DrillEntry[]>([])
   const selectedActivityId = ref<string | null>(null)
   const rowId = ref<string | null>(null)
@@ -205,7 +209,7 @@ export function useWorkflowDesigner() {
     try {
       const { data, error } = await getApiV1WorkflowDefinitionsById({ path: { id: definitionRowId } })
       if (error || !data) {
-        loadError.value = error ? String(error) : "加载定义失败"
+        loadError.value = extractApiErrorMessage(error, "加载定义失败")
         return
       }
       rowId.value = definitionRowId
@@ -629,7 +633,7 @@ export function useWorkflowDesigner() {
       })
       if (seq !== validationSeq) return problems.value
       if (error) {
-        validationError.value = typeof error === "string" ? error : JSON.stringify(error)
+        validationError.value = extractApiErrorMessage(error, "校验请求失败，请稍后重试")
         return problems.value
       }
       validationError.value = null
@@ -676,7 +680,7 @@ export function useWorkflowDesigner() {
         },
       })
       if (error) {
-        saveError.value = typeof error === "string" ? error : JSON.stringify(error)
+        saveError.value = extractApiErrorMessage(error, "保存失败，请稍后重试")
         return
       }
       // A published version is immutable: the backend forks a new draft version
@@ -692,6 +696,25 @@ export function useWorkflowDesigner() {
     } finally {
       saving.value = false
     }
+  }
+
+  /**
+   * Auto-save then dispatch a debug run against the current draft version.
+   * Returns the new instance id on success, or null if save/API failed.
+   */
+  async function debugRun(input?: Record<string, unknown>): Promise<string | null> {
+    if (!rowId.value) return null
+    // Auto-save first: debug runs against the persisted draft (ADR 0011)
+    saveError.value = null
+    await save()
+    if (saveError.value) return null
+
+    const { data, error } = await postApiV1WorkflowInstancesDebugRunById({
+      path: { id: rowId.value },
+      body: { input: input ?? {} },
+    })
+    if (error || data == null) return null
+    return String(data)
   }
 
   async function loadVersions(): Promise<void> {
@@ -738,7 +761,7 @@ export function useWorkflowDesigner() {
         },
       })
       if (error) {
-        saveError.value = typeof error === "string" ? error : JSON.stringify(error)
+        saveError.value = extractApiErrorMessage(error, "发布失败，请稍后重试")
         // Backend hard gate rejected: re-validate to backfill structured problems
         // so the designer shows which nodes failed, not just a flattened message.
         await validate()
@@ -842,6 +865,8 @@ export function useWorkflowDesigner() {
     saveViewport,
     getViewport,
     save,
+    canDebug,
+    debugRun,
   }
 }
 

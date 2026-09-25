@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { ArrowLeft, History, Pencil, Redo2, RotateCcw, Trash2, Undo2, Upload } from "@lucide/vue"
+import { ArrowLeft, History, Pencil, Play, Redo2, RotateCcw, Trash2, Undo2, Upload, X } from "@lucide/vue"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
@@ -13,6 +13,7 @@ import DesignerCanvas from "./DesignerCanvas.vue"
 import ActivityPalette from "./ActivityPalette.vue"
 import RightToolDock from "./RightToolDock.vue"
 import PublishDialog from "./PublishDialog.vue"
+import DebugRunDialog from "./DebugRunDialog.vue"
 import ProblemListPanel from "./ProblemListPanel.vue"
 import VersionHistorySheet from "./VersionHistorySheet.vue"
 
@@ -26,8 +27,20 @@ const canvasRef = ref<InstanceType<typeof DesignerCanvas> | null>(null)
 const publishOpen = ref(false)
 const historyOpen = ref(false)
 const editOpen = ref(false)
+const debugOpen = ref(false)
+const debugRunning = ref(false)
+const debugError = ref<string | null>(null)
 /** Problem list dock open state; auto-expands when validation finds problems. */
 const problemPanelOpen = ref(false)
+
+/** Load/save failure banner text; backend 500s can carry a whole stack trace. */
+const bannerError = computed(() => props.designer.loadError.value || props.designer.saveError.value)
+/** Dismissing reclaims the canvas; any new error (retries null the ref first,
+ *  so even an identical message) re-reveals the banner. */
+const errorBannerDismissed = ref(false)
+watch(bannerError, () => {
+  errorBannerDismissed.value = false
+})
 
 // Keep the dock in sync with validation results without fighting the user:
 // reveal newly-appearing problems (0→N) and auto-collapse once clean (→0), but
@@ -56,6 +69,26 @@ async function onPublishClick(): Promise<void> {
     return
   }
   publishOpen.value = true
+}
+
+async function onDebugConfirm(input: Record<string, unknown>): Promise<void> {
+  debugRunning.value = true
+  debugError.value = null
+  try {
+    const instanceId = await props.designer.debugRun(input)
+    if (!instanceId) {
+      debugError.value = props.designer.saveError.value || "调试启动失败，请稍后重试"
+      return
+    }
+    debugOpen.value = false
+    const url = router.resolve({
+      name: "instance-detail",
+      params: { workspaceId: workspaceId.value, instanceId },
+    }).href
+    window.open(url, "_blank")
+  } finally {
+    debugRunning.value = false
+  }
 }
 
 /** Synthetic shape for the reused metadata dialog (edit mode keyed by row id). */
@@ -176,6 +209,15 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown))
         <Button size="sm" variant="ghost" :disabled="designer.saving.value || designer.readonly.value" @click="designer.save()">
           {{ designer.saving.value ? "保存中…" : "保存" }}
         </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="!designer.canDebug.value || designer.saving.value"
+          :title="designer.canDebug.value ? '调试运行' : '已发布版本不能直接调试，请先保存草稿'"
+          @click="debugOpen = true"
+        >
+          <Play :size="14" /> 调试
+        </Button>
         <Button size="sm" :disabled="designer.readonly.value || designer.saving.value" @click="onPublishClick">
           <Upload :size="14" /> 发布
         </Button>
@@ -201,11 +243,25 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown))
             @edge-click="(edgeId: string) => { designer.selectedActivityId.value = null; designer.selectedEdgeId.value = edgeId }"
             @connect-request="onConnectRequest"
           />
+          <!-- Failure banner is a notification, not content: capped height with
+               internal scroll and a dismiss button so a backend stack trace can
+               never bury the canvas. -->
           <div
-            v-if="designer.loadError.value || designer.saveError.value"
-            class="absolute inset-x-0 top-0 border-b bg-destructive/10 px-4 py-2 text-xs text-destructive"
+            v-if="bannerError && !errorBannerDismissed"
+            role="alert"
+            class="absolute inset-x-0 top-0 z-10 border-b border-destructive/40 bg-destructive/10 backdrop-blur-sm"
           >
-            {{ designer.loadError.value || designer.saveError.value }}
+            <button
+              type="button"
+              class="absolute right-2 top-2 rounded p-0.5 text-destructive hover:bg-destructive/20"
+              title="关闭"
+              @click="errorBannerDismissed = true"
+            >
+              <X :size="14" />
+            </button>
+            <div class="max-h-32 overflow-y-auto px-4 py-2 pr-9 text-xs whitespace-pre-wrap break-words text-destructive">
+              {{ bannerError }}
+            </div>
           </div>
           <div
             v-if="designer.lastSavedAt.value"
@@ -229,6 +285,15 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown))
     </div>
 
     <PublishDialog :designer="designer" :open="publishOpen" @update:open="(open: boolean) => (publishOpen = open)" />
+
+    <DebugRunDialog
+      :open="debugOpen"
+      :inputs="designer.inputs.value"
+      :running="debugRunning"
+      :error="debugError"
+      @update:open="(open: boolean) => (debugOpen = open)"
+      @confirm="onDebugConfirm"
+    />
 
     <VersionHistorySheet :designer="designer" :open="historyOpen" @update:open="(open: boolean) => (historyOpen = open)" />
 

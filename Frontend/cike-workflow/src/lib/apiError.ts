@@ -10,7 +10,10 @@ export function extractApiErrorMessage(
   error: unknown,
   fallback = "操作失败，请稍后重试",
 ): string {
-  if (!error || typeof error !== "object") return fallback
+  if (!error || typeof error !== "object") {
+    // A plain string error is already the message (e.g. a text/plain body).
+    return typeof error === "string" && error.trim() ? error : fallback
+  }
 
   const detail = error as {
     errors?: Record<string, unknown>

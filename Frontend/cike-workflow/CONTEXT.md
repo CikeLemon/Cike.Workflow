@@ -98,6 +98,29 @@
 
 工作流实例中某个活动的一次执行痕迹。通过 **activityId** 与画布上的活动节点对应，带**活动状态（ActivityStatus）**：Pending / Running / Completed / Canceled / Faulted。用于在画布上标记"流程运行到了哪里"。
 
+# 调试（Debug Run）
+
+对**草稿版本行**发起的试跑：从开始节点启动，实例标记 `IsDebug = true`，副作用真实发生。调试前自动保存当前画布内容（所见即所跑）；已发布版本不能直接调试。调试发起后在**新标签页**打开实例详情，设计器保持不动，支持"改 → 调 → 看 → 再改"的迭代循环。调试实例默认不出现在实例列表中。
+_Avoid_: 试运行、执行
+
+## 调试输入（Debug Input）
+
+调试发起时用户可填写的工作流输入键值对。始终弹出输入弹窗（即使工作流无输入声明，也作为确认步骤）。Literal 类型的默认表达式预填字面值；非 Literal 类型留空并以 placeholder 展示表达式摘要，不填则不传该 key、由后端求值默认表达式。
+
+## 执行进度事件（Execution Progress Event）
+
+经 SignalR 实时推送的节点级/实例级状态变化通知。节点级四种：ActivityStarted / ActivityCompleted / ActivitySuspended / ActivityFaulted；实例终态四种：WorkflowFinished / WorkflowSuspended / WorkflowFaulted / WorkflowCanceled。载荷携带 ActivityNodeId 与 ActivityInstanceId，可直接映射到画布节点。应用级维护单条 SignalR 连接，进入实例详情时 Watch（加入实例分组），离开时 Unwatch。
+_Avoid_: WebSocket 消息、推送通知
+
+## 实例概览（Instance Overview）
+
+实例详情页右侧工具区在**未选中节点**时展示的面板：实例状态、工作流输入、工作流输出、关联 ID 与创建时间等元信息。与节点执行详情互斥切换，复用设计器右侧工具区的 Pin/折叠/展开机制。
+
+## 节点执行详情（Activity Execution Detail）
+
+实例详情页右侧工具区在**选中节点**时展示的面板：活动名称 + 类型 + 状态徽标、activityState 与 outputs 的 JSON 树形只读展示、执行日志区域。循环体内同一节点有多条执行记录时，取最新一条展示。
+_Avoid_: 节点属性、活动面板
+
 ## 表达式（Expression）
 
 活动输入所承载的"如何得到值"的描述，形如 { 类型, 值 }；**值的具体含义由类型决定**，同一字段在不同类型下值的形态完全不同。

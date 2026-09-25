@@ -776,6 +776,49 @@
         }
       }
     },
+    "/api/v1/WorkflowInstances/DebugRun/{id}": {
+      "post": {
+        "tags": [
+          "WorkflowInstanceService"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunDebugWorkflowDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
     "/api/v1/WorkflowInstances/Logs/{id}": {
       "get": {
         "tags": [
@@ -1783,6 +1826,17 @@
         },
         "additionalProperties": false
       },
+      "RunDebugWorkflowDto": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SaveWorkflowDefinitionDto": {
         "type": "object",
         "properties": {
@@ -2236,8 +2290,8 @@
             "type": "string"
           },
           "publishedBy": {
-            "type": "string",
-            "format": "uuid"
+            "type": "integer",
+            "format": "int64"
           },
           "publishedAt": {
             "type": "string",
@@ -2427,6 +2481,10 @@
             "type": "boolean",
             "nullable": true
           },
+          "isDebug": {
+            "type": "boolean",
+            "nullable": true
+          },
           "beforeLastUpdated": {
             "type": "string",
             "format": "date-time",
@@ -2497,6 +2555,9 @@
             "type": "string"
           },
           "isExecuting": {
+            "type": "boolean"
+          },
+          "isDebug": {
             "type": "boolean"
           },
           "incidentCount": {
@@ -2595,6 +2656,9 @@
             }
           },
           "isSystem": {
+            "type": "boolean"
+          },
+          "isDebug": {
             "type": "boolean"
           },
           "completionCallbacks": {

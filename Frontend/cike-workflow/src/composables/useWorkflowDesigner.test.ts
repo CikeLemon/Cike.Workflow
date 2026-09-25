@@ -17,6 +17,7 @@ const publish = vi.fn()
 const rollback = vi.fn()
 const versionList = vi.fn()
 const validateCanvas = vi.fn()
+const debugRun = vi.fn()
 
 vi.mock("@/api/generated", () => ({
   getApiV1WorkflowDefinitionsById: (...args: unknown[]) => getById(...args),
@@ -29,6 +30,7 @@ vi.mock("@/api/generated", () => ({
   postApiV1WorkflowDefinitionsRollback: (...args: unknown[]) => rollback(...args),
   getApiV1WorkflowDefinitionsVersionList: (...args: unknown[]) => versionList(...args),
   postApiV1WorkflowDefinitionsValidateCanvas: (...args: unknown[]) => validateCanvas(...args),
+  postApiV1WorkflowInstancesDebugRunById: (...args: unknown[]) => debugRun(...args),
 }))
 
 import { useWorkflowDesigner } from "@/composables/useWorkflowDesigner"
@@ -643,5 +645,91 @@ describe("useWorkflowDesigner workflow config state", () => {
     // In readonly mode the command still runs (UI should prevent calling),
     // but the important thing is that save/publish are blocked.
     expect(designer.readonly.value).toBe(true)
+  })
+})
+
+describe("debugRun", () => {
+  beforeEach(() => {
+    save.mockResolvedValue({ data: "100", error: undefined })
+    debugRun.mockResolvedValue({ data: "inst-999", error: undefined })
+  })
+
+  it("DebugRun_SavesFirstThenCallsApi", async () => {
+    getById.mockResolvedValue({ data: makeDetail(), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    const instanceId = await designer.debugRun({ key: "val" })
+
+    expect(save).toHaveBeenCalled()
+    expect(debugRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { id: "100" },
+        body: { input: { key: "val" } },
+      }),
+    )
+    expect(instanceId).toBe("inst-999")
+  })
+
+  it("DebugRun_AbortsIfSaveFails", async () => {
+    save.mockResolvedValue({ data: null, error: { message: "conflict" } })
+    getById.mockResolvedValue({ data: makeDetail(), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    const instanceId = await designer.debugRun({})
+
+    expect(debugRun).not.toHaveBeenCalled()
+    expect(instanceId).toBeNull()
+    expect(designer.saveError.value).toBeTruthy()
+  })
+
+  it("DebugRun_ReturnsNullOnApiError", async () => {
+    debugRun.mockResolvedValue({ data: null, error: { message: "bad request" } })
+    getById.mockResolvedValue({ data: makeDetail(), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    const instanceId = await designer.debugRun({})
+
+    expect(instanceId).toBeNull()
+  })
+
+  it("DebugRun_PassesEmptyInputWhenNoneProvided", async () => {
+    getById.mockResolvedValue({ data: makeDetail(), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    await designer.debugRun()
+
+    expect(debugRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: { input: {} },
+      }),
+    )
+  })
+
+  it("CanDebug_IsFalseForPublishedVersion", async () => {
+    getById.mockResolvedValue({ data: makeDetail({ isPublished: true }), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    expect(designer.canDebug.value).toBe(false)
+  })
+
+  it("CanDebug_IsTrueForDraftLatest", async () => {
+    getById.mockResolvedValue({ data: makeDetail({ isLatest: true, isPublished: false }), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    expect(designer.canDebug.value).toBe(true)
+  })
+
+  it("CanDebug_IsFalseForNonLatestVersion", async () => {
+    getById.mockResolvedValue({ data: makeDetail({ isLatest: false }), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.viewVersion("100")
+
+    expect(designer.canDebug.value).toBe(false)
   })
 })

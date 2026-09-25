@@ -52,7 +52,9 @@ async function confirm() {
         />
       </div>
 
-      <p v-if="designer.saveError.value" class="text-xs text-destructive">
+      <!-- Same failure text as the canvas banner: cap + scroll so a backend
+           stack trace cannot stretch the dialog off-screen. -->
+      <p v-if="designer.saveError.value" class="max-h-32 overflow-y-auto text-xs whitespace-pre-wrap break-words text-destructive">
         {{ designer.saveError.value }}
       </p>
 

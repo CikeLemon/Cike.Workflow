@@ -13,6 +13,16 @@ const data = computed(() => props.node.getData() as DesignerNodeData & { selecte
 const icon = computed(() => resolveActivityIcon(data.value.icon))
 
 const statusUi = computed(() => (data.value.status != null ? ACTIVITY_STATUS_UI[data.value.status] : null))
+
+/** Runtime status border: Running = pulse, Faulted = red. Lower priority than selected/error. */
+const statusBorderClass = computed(() => {
+  if (data.value.selected || data.value.hasError) return ""
+  switch (data.value.status) {
+    case 1: return "border-info animate-pulse"
+    case 4: return "border-destructive ring-1 ring-destructive/35"
+    default: return ""
+  }
+})
 </script>
 
 <template>
@@ -35,7 +45,7 @@ const statusUi = computed(() => (data.value.status != null ? ACTIVITY_STATUS_UI[
           ? 'border-primary ring-2 ring-primary/40'
           : data.hasError
             ? 'border-destructive ring-1 ring-destructive/35'
-            : '',
+            : statusBorderClass,
       ]"
     >
       <component :is="icon" :size="14" class="shrink-0 text-muted-foreground" />
