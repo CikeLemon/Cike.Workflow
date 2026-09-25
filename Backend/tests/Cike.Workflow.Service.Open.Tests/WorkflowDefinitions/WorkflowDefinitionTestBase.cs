@@ -182,6 +182,17 @@ public abstract class WorkflowDefinitionTestBase : BaseIntegrationTest
         throw new TimeoutException("条件在超时时间内未满足。");
     }
 
+    /// <summary>播种一条新鲜的调试成功记录（发布门禁证据）：Finished + 创建时间在未来一分钟，保证晚于行内容变更。</summary>
+    protected Task<long> SeedDebugSuccessAsync(string definitionId, long definitionVersionRowId, DateTime? createdAt = null)
+        => SeedInstanceAsync(definitionId, definitionVersionRowId, isDebug: true, WorkflowStatus.Finished, createdAt ?? DateTime.Now.AddMinutes(1));
+
+    /// <summary>读实例状态字段：兼容字符串与数字两种枚举序列化形态。</summary>
+    protected static string GetInstanceStatus(JsonElement element)
+    {
+        var raw = element.GetProperty("status");
+        return raw.ValueKind == JsonValueKind.String ? raw.GetString()! : ((WorkflowStatus)raw.GetInt32()).ToString();
+    }
+
     /// <summary>框架将 long 序列化为字符串，统一按字符串读取再解析。</summary>
     protected static async Task<long> ReadLongAsync(HttpResponseMessage response)
         => long.Parse((await response.Content.ReadAsStringAsync()).Trim('"'));

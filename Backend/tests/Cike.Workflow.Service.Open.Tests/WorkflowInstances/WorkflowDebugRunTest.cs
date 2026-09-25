@@ -26,12 +26,6 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
         return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<JsonDocument>() : null;
     }
 
-    private static string GetStatus(JsonElement element)
-    {
-        var raw = element.GetProperty("status");
-        return raw.ValueKind == JsonValueKind.String ? raw.GetString()! : ((WorkflowStatus)raw.GetInt32()).ToString();
-    }
-
     private static long GetTotal(JsonDocument doc)
     {
         var raw = doc.RootElement.GetProperty("total");
@@ -50,7 +44,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         // 发布门禁要求调试证据：播种一条新鲜的调试成功记录
-        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddMinutes(1));
+        await SeedDebugSuccessAsync(definitionId, rowId);
         await EnsureSuccessAsync(await PostPublishAsync(rowId, new { root = CreateValidCanvas(prefix) }));
         return rowId;
     }
@@ -58,7 +52,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     // ---------- 发起调试 ----------
 
     [Test]
-    public async Task RunDebugAsync_草稿行发起_实例创建并标记IsDebug()
+    public async Task RunDebugAsync_WithDraftRow_CreatesIsDebugInstance()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         await EnsureSuccessAsync(await PostSaveCanvasAsync(rowId, "dbg"));
@@ -74,11 +68,11 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
         // 后台事件异步创建实例，轮询到详情后断言调试标记
         var detail = await WaitUntilAsync(() => TryGetInstanceAsync(instanceId));
         Assert.That(GetBool(detail!.RootElement, "isDebug"), Is.True);
-        Assert.That(GetStatus(detail.RootElement), Is.EqualTo(nameof(WorkflowStatus.Finished)));
+        Assert.That(GetInstanceStatus(detail.RootElement), Is.EqualTo(nameof(WorkflowStatus.Finished)));
     }
 
     [Test]
-    public async Task RunDebugAsync_已发布行_返回400()
+    public async Task RunDebugAsync_WithPublishedRow_ReturnsBadRequest()
     {
         var rowId = await PreparePublishedAsync("pubd");
 
@@ -91,7 +85,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     // ---------- 实例可见性 ----------
 
     [Test]
-    public async Task PostPagedListAsync_默认隐藏调试实例_显式筛选可见()
+    public async Task PostPagedListAsync_WithDefaultFilter_HidesDebugInstances()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished);
@@ -109,7 +103,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task GetDebugRunsAsync_仅返回该草稿行调试记录且按创建时间倒序()
+    public async Task GetDebugRunsAsync_WithMixedRecords_ReturnsRowDebugRunsDescending()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddHours(-2));
@@ -126,14 +120,14 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
         var items = doc!.RootElement.EnumerateArray().ToList();
         Assert.That(items, Has.Count.EqualTo(2));
         // 创建时间倒序：晚播种的 Faulted 在前
-        Assert.That(GetStatus(items[0]), Is.EqualTo(nameof(WorkflowStatus.Faulted)));
-        Assert.That(GetStatus(items[1]), Is.EqualTo(nameof(WorkflowStatus.Finished)));
+        Assert.That(GetInstanceStatus(items[0]), Is.EqualTo(nameof(WorkflowStatus.Faulted)));
+        Assert.That(GetInstanceStatus(items[1]), Is.EqualTo(nameof(WorkflowStatus.Finished)));
     }
 
     // ---------- 调试锁定：保存 / 回滚 / 删除 ----------
 
     [Test]
-    public async Task SaveAsync_草稿调试运行中_返回400()
+    public async Task SaveAsync_WithActiveDebugRun_ReturnsBadRequest()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Executing);
@@ -145,7 +139,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task SaveAsync_调试已到终态_保存成功()
+    public async Task SaveAsync_WithTerminalDebugRun_Succeeds()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished);
@@ -156,7 +150,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task RollbackAsync_草稿调试运行中_返回400()
+    public async Task RollbackAsync_WithActiveDebugRun_ReturnsBadRequest()
     {
         var (definitionId, firstRowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, firstRowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddMinutes(1));
@@ -174,7 +168,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task DeleteAsync_存在运行中实例_返回400()
+    public async Task DeleteAsync_WithRunningInstance_ReturnsBadRequest()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, rowId, isDebug: false, WorkflowStatus.Executing);
@@ -186,7 +180,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task DeleteAsync_实例均为终态_允许删除()
+    public async Task DeleteAsync_WithAllTerminalInstances_Succeeds()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, rowId, isDebug: false, WorkflowStatus.Finished);
@@ -200,7 +194,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     // ---------- 发布门禁 ----------
 
     [Test]
-    public async Task PublishAsync_草稿未调试_返回400()
+    public async Task PublishAsync_WithoutDebugRun_ReturnsBadRequest()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
 
@@ -211,7 +205,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task PublishAsync_最近一次调试未成功_返回400()
+    public async Task PublishAsync_WithFailedDebugRun_ReturnsBadRequest()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Faulted, DateTime.Now.AddMinutes(1));
@@ -223,7 +217,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task PublishAsync_调试后草稿有变更_返回400()
+    public async Task PublishAsync_WithStaleDebugRun_ReturnsBadRequest()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         // 调试证据早于草稿行创建时间：行在调试后有变更
@@ -236,10 +230,10 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task PublishAsync_调试成功且证据新鲜_发布成功()
+    public async Task PublishAsync_WithFreshDebugRun_Publishes()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
-        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddMinutes(1));
+        await SeedDebugSuccessAsync(definitionId, rowId);
 
         var response = await PostPublishAsync(rowId, new { root = CreateValidCanvas("gate4") });
 

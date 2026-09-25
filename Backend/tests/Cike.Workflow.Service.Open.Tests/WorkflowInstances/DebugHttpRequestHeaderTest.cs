@@ -140,7 +140,7 @@ internal class DebugHttpRequestHeaderTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task RunDebugAsync_调试实例_出站请求携带isDebug头()
+    public async Task RunDebugAsync_WithDebugInstance_SendsIsDebugHeader()
     {
         await using var receiver = new CaptureReceiver();
         await receiver.StartAsync();
@@ -159,13 +159,11 @@ internal class DebugHttpRequestHeaderTest : WorkflowDefinitionTestBase
             var response = await CreateClient().GetAsync($"/api/v1/WorkflowInstances/{instanceId}");
             return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<JsonDocument>() : null;
         });
-        var rawStatus = detail!.RootElement.GetProperty("status");
-        var statusText = rawStatus.ValueKind == JsonValueKind.String ? rawStatus.GetString()! : ((WorkflowStatus)rawStatus.GetInt32()).ToString();
-        Assert.That(statusText, Is.EqualTo(nameof(WorkflowStatus.Finished)));
+        Assert.That(GetInstanceStatus(detail!.RootElement), Is.EqualTo(nameof(WorkflowStatus.Finished)));
     }
 
     [Test]
-    public async Task DispatchAsync_正式实例_出站请求不携带isDebug头()
+    public async Task DispatchAsync_WithProductionInstance_OmitsIsDebugHeader()
     {
         await using var receiver = new CaptureReceiver();
         await receiver.StartAsync();

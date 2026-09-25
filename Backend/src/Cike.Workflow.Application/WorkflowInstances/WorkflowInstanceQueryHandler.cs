@@ -33,16 +33,9 @@ public class WorkflowInstanceQueryHandler(IWorkflowInstanceRepository workflowIn
     [LocalEventHandler]
     public async Task GetDebugRunsAsync(GetWorkflowDebugRunsQuery query, CancellationToken cancellationToken = default)
     {
-        var instances = await workflowInstanceRepository.FindManyAsync(new WorkflowInstanceFilter
-        {
-            DefinitionVersionId = query.DefinitionVersionId,
-            IsDebug = true,
-        }, cancellationToken);
+        var instances = await workflowInstanceRepository.FindDebugRunsAsync(query.DefinitionVersionId, maxCount: 20, cancellationToken);
 
-        var dtos = instances
-            .OrderByDescending(x => x.CreatedAt)
-            .Take(20)
-            .Adapt<List<WorkflowInstanceItemDto>>();
+        var dtos = instances.Adapt<List<WorkflowInstanceItemDto>>();
         await FillDefinitionNamesAsync(dtos, cancellationToken);
 
         query.Result = dtos;

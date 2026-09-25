@@ -29,7 +29,7 @@ internal class WorkflowDefinitionPublishTest : WorkflowDefinitionTestBase
     private async Task<(string DefinitionId, long RowId)> PrepareDebuggedDraftAsync()
     {
         var (definitionId, rowId) = await PrepareAsync();
-        await SeedInstanceAsync(definitionId, rowId, isDebug: true, Core.Enums.WorkflowStatus.Finished, DateTime.Now.AddMinutes(1));
+        await SeedDebugSuccessAsync(definitionId, rowId);
         return (definitionId, rowId);
     }
 
@@ -183,7 +183,7 @@ internal class WorkflowDefinitionPublishTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task PublishAsync_最新行已是发布态_返回400要求先保存草稿()
+    public async Task PublishAsync_WithPublishedLatest_ReturnsBadRequest()
     {
         var (definitionId, rowId) = await PrepareDebuggedDraftAsync();
         await EnsureSuccessAsync(await PostPublishCanvasAsync(rowId));
@@ -231,7 +231,7 @@ internal class WorkflowDefinitionPublishTest : WorkflowDefinitionTestBase
         await EnsureSuccessAsync(await CreateClient().PostAsJsonAsync($"/api/v1/WorkflowDefinitions/Save/{rowId}",
             new { root = CreateValidCanvas("hist2") }));
         var secondRowId = await GetVersionRowIdAsync(definitionId, 2);
-        await SeedInstanceAsync(definitionId, secondRowId, isDebug: true, Core.Enums.WorkflowStatus.Finished, DateTime.Now.AddMinutes(1));
+        await SeedDebugSuccessAsync(definitionId, secondRowId);
 
         var response = await PostPublishCanvasAsync(rowId, "v2", prefix: "hist2");
 

@@ -125,17 +125,8 @@ public class WorkflowDefinitionCommandHandler(
 
         var latest = await GetLatestAsync(entity.DefinitionId, cancellationToken);
 
-        // 发布门禁：只允许发布草稿行，且草稿行最新一次调试已成功并晚于内容变更（保证"发布即所调"）
-        if (latest.IsPublished)
-            throw new UserFriendlyException("当前没有待发布的草稿，请先保存草稿并调试成功后再发布。");
-
-        var debugRun = await debugRunGuard.FindLatestDebugRunAsync(latest.DefinitionId, latest.Id, cancellationToken);
-        if (debugRun is null)
-            throw new UserFriendlyException("该草稿尚未调试，请先完成一次调试运行再发布。");
-        if (debugRun.Status != WorkflowStatus.Finished)
-            throw new UserFriendlyException("最近一次调试未成功，请重新调试通过后再发布。");
-        if (debugRun.CreatedAt < latest.UpdatedAt)
-            throw new UserFriendlyException("草稿在最近一次调试后已有变更，请重新调试通过后再发布。");
+        // 发布门禁：保证"发布即所调"（未调试 / 未成功 / 调试后已变更 均拒绝）
+        await debugRunGuard.EnsurePublishableAsync(latest, cancellationToken);
 
         var note = command.PublishedNote ?? string.Empty;
         var row = await PersistDraftAsync(latest, data, command.Options, row =>
@@ -228,15 +219,9 @@ public class WorkflowDefinitionCommandHandler(
             ?? throw new UserFriendlyException("工作流定义不存在，请检查后重试。");
     }
 
-    /// <summary>
-    /// 定义级短锁（30 分钟等待上限，仅作操作间互斥的安全阀）：
-    /// 串行化"检查调试状态 → 变更内容"的临界区；获取失败说明有并发操作长时间未释放，按冲突拒绝。
-    /// </summary>
-    private async Task<IAsyncDisposable> AcquireDefinitionLockAsync(string definitionId, CancellationToken cancellationToken = default)
-    {
-        var handle = await lockService.TryGetAsync(WorkflowDefinitionLock.GetKey(definitionId), WorkflowDefinitionLock.Timeout, cancellationToken);
-        return handle ?? throw new UserFriendlyException("当前有其他操作正在进行，请稍后重试。");
-    }
+    /// <summary>定义级短锁：串行化"检查调试状态 → 变更内容"的临界区（统一获取口见 WorkflowDefinitionLockExtensions）。</summary>
+    private Task<IAsyncDisposable> AcquireDefinitionLockAsync(string definitionId, CancellationToken cancellationToken = default)
+        => lockService.AcquireAsync(definitionId, cancellationToken);
 
     /// <summary>
     /// 草稿落库（保存与发布共用）：最新行未发布时就地覆盖内容（版本号、IsLatest、IsPublished 不变）；

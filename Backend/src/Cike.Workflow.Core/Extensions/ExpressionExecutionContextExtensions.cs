@@ -445,19 +445,35 @@ public static class ExpressionExecutionContextExtensions
         /// <exception cref="InvalidOperationException">Thrown when the activity is not found.</exception>
         public object? GetOutput(string activityIdOrName, string? outputName)
         {
+            if (!context.TryGetOutput(activityIdOrName, outputName, out var value))
+                throw new InvalidOperationException("Activity not found.");
+
+            return value;
+        }
+
+        /// <summary>
+        /// Attempts to get the value of the specified output. Returns false when the activity
+        /// cannot be resolved within the current container (e.g. the root workflow itself).
+        /// </summary>
+        public bool TryGetOutput(string activityIdOrName, string? outputName, out object? value)
+        {
             var workflowExecutionContext = context.GetWorkflowExecutionContext();
             var activityExecutionContext = context.GetActivityExecutionContext();
             var activity = activityExecutionContext.FindActivityByIdOrName(activityIdOrName);
 
             if (activity == null)
-                throw new InvalidOperationException("Activity not found.");
+            {
+                value = null;
+                return false;
+            }
 
             var outputRegister = workflowExecutionContext.ActivityOutputRegister;
             var outputRecordCandidates = outputRegister.FindMany(activity.Id, outputName);
             var containerIds = activityExecutionContext.GetAncestors().Select(x => x.Id).ToList();
             var filteredOutputRecordCandidates = outputRecordCandidates.Where(x => containerIds.Contains(x.ContainerId));
             var outputRecord = filteredOutputRecordCandidates.FirstOrDefault();
-            return outputRecord?.Value;
+            value = outputRecord?.Value;
+            return true;
         }
 
         /// <summary>

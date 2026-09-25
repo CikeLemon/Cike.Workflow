@@ -21,11 +21,7 @@ internal class WorkflowInstanceCommandHandler(
         command.WorkflowInstanceId = identityGenerator.NextId();
 
         // 定义级短锁：与保存/回滚/发布互斥，避免"草稿校验通过 → 内容被并发抽换"的窗口
-        var handle = await lockService.TryGetAsync(WorkflowDefinitionLock.GetKey(row.DefinitionId), WorkflowDefinitionLock.Timeout, cancellationToken);
-        if (handle is null)
-            throw new UserFriendlyException("当前有其他操作正在进行，请稍后重试。");
-
-        await using (handle)
+        await using (await lockService.AcquireAsync(row.DefinitionId, cancellationToken))
         {
             // 锁内复查：草稿状态以持锁后读到的为准
             row = await GetDraftRowAsync(command.DefinitionVersionId, cancellationToken);

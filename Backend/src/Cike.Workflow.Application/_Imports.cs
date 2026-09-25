@@ -36,5 +36,6 @@ global using Cike.Workflow.Application.WorkflowInstances.Queries;
 global using Cike.Workflow.Application.Contracts.WorkflowInstances;
 global using Cike.Workflow.Domain.Filters;
 global using Cike.Workflow.Runtime;
+global using Cike.Workflow.Application.WorkflowDefinitions;
 global using Cike.Locks.Abstracts;
 global using Cike.UniversalId.ULong;

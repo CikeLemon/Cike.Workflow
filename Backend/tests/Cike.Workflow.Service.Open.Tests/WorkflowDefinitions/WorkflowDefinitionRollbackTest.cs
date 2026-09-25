@@ -21,7 +21,7 @@ internal class WorkflowDefinitionRollbackTest : WorkflowDefinitionTestBase
     {
         var versions = await GetVersionListAsync(definitionId);
         var latestRowId = GetLong(versions[0], "id");
-        await SeedInstanceAsync(definitionId, latestRowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddMinutes(1));
+        await SeedDebugSuccessAsync(definitionId, latestRowId);
         await EnsureSuccessAsync(await PostPublishAsync(id, new { root = CreateValidCanvas(prefix), publishedNote = "发布" }));
     }
 

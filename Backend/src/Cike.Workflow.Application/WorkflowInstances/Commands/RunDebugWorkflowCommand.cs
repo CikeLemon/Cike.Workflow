@@ -2,7 +2,7 @@ namespace Cike.Workflow.Application.WorkflowInstances.Commands;
 
 /// <summary>
 /// 对草稿版本行发起调试（试跑）：从开始节点启动，实例标记 IsDebug，副作用真实发生。
-/// 命令处理时预生成实例 Id，便于调用方在后台派发完成前即可轮询实例详情。
+/// 命令处理时预生成实例 Id；派发经本地事件总线同步完成，返回 Id 时实例已创建并执行（未挂起即到终态）。
 /// </summary>
 public record RunDebugWorkflowCommand(long DefinitionVersionId, IDictionary<string, object>? Input) : Command
 {
