@@ -103,7 +103,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task GetDebugRunsAsync_WithMixedRecords_ReturnsRowDebugRunsDescending()
+    public async Task PostPagedListAsync_WithVersionAndDebugFilter_ReturnsRowDebugRunsDescending()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddHours(-2));
@@ -113,11 +113,12 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
         var (_, otherRowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, otherRowId, isDebug: true, WorkflowStatus.Finished);
 
-        var response = await CreateClient().GetAsync($"/api/v1/WorkflowInstances/DebugRuns/{rowId}");
+        // 调试记录走通用实例分页列表：按草稿行 + IsDebug 圈定，排序默认创建时间倒序
+        var response = await PostPagedListAsync(new { definitionVersionId = rowId, isDebug = true });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        var items = doc!.RootElement.EnumerateArray().ToList();
+        var items = doc!.RootElement.GetProperty("items").EnumerateArray().ToList();
         Assert.That(items, Has.Count.EqualTo(2));
         // 创建时间倒序：晚播种的 Faulted 在前
         Assert.That(GetInstanceStatus(items[0]), Is.EqualTo(nameof(WorkflowStatus.Faulted)));

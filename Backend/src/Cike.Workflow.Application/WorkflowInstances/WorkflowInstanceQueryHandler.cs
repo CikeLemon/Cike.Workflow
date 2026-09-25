@@ -31,17 +31,6 @@ public class WorkflowInstanceQueryHandler(IWorkflowInstanceRepository workflowIn
     }
 
     [LocalEventHandler]
-    public async Task GetDebugRunsAsync(GetWorkflowDebugRunsQuery query, CancellationToken cancellationToken = default)
-    {
-        var instances = await workflowInstanceRepository.FindDebugRunsAsync(query.DefinitionVersionId, maxCount: 20, cancellationToken);
-
-        var dtos = instances.Adapt<List<WorkflowInstanceItemDto>>();
-        await FillDefinitionNamesAsync(dtos, cancellationToken);
-
-        query.Result = dtos;
-    }
-
-    [LocalEventHandler]
     public async Task GetAsync(GetWorkflowInstanceQuery query, CancellationToken cancellationToken = default)
     {
         // 不加 BeginAsNoTracking：影子属性 SerializedWorkflowState 只在跟踪条目上可读，

@@ -56,17 +56,6 @@ public class WorkflowInstanceService : MinimalApiServiceBase
         return TypedResults.Ok(command.WorkflowInstanceId);
     }
 
-    /// <summary>查某草稿版本行的调试记录（调试实例），按创建时间倒序。</summary>
-    public async Task<Results<Ok<List<WorkflowInstanceItemDto>>, BadRequest>> GetDebugRunsAsync(
-        [FromServices] ILocalEventBus localEventBus,
-        long id,
-        CancellationToken cancellationToken = default)
-    {
-        var query = new GetWorkflowDebugRunsQuery(id);
-        await localEventBus.PublishAsync(query, cancellationToken);
-        return TypedResults.Ok(query.Result);
-    }
-
     public async Task<Results<Ok<List<WorkflowExecutionLogEntry>>, BadRequest>> GetLogsAsync(
         [FromServices] ILocalEventBus localEventBus,
         long id,
