@@ -154,7 +154,6 @@ internal class WorkflowDefinitionCacheTest : WorkflowDefinitionTestBase
     {
         var (definitionId, rowId) = await PrepareAsync();
         await EnsureSuccessAsync(await PostSaveAsync(rowId, new { root = CreateValidCanvas("pub1") }));
-        await SeedDebugSuccessAsync(definitionId, rowId);
         await EnsureSuccessAsync(await PostPublishAsync(rowId, new { root = CreateValidCanvas("pub1"), publishedNote = "发布" }));
         return (definitionId, rowId);
     }
@@ -223,7 +222,6 @@ internal class WorkflowDefinitionCacheTest : WorkflowDefinitionTestBase
         var (definitionId, v1RowId) = await PreparePublishedAsync();
         var save = await PostSaveAsync(v1RowId, new { root = CreateValidCanvas("pub2") });
         var draftId = await ReadLongAsync(save);
-        await SeedDebugSuccessAsync(definitionId, draftId);
         await EnsureSuccessAsync(await PostPublishAsync(draftId, new { root = CreateValidCanvas("pub2"), publishedNote = "发布" }));
 
         var published = await GetLatestPublishedAsync(definitionId);
@@ -255,7 +253,6 @@ internal class WorkflowDefinitionCacheTest : WorkflowDefinitionTestBase
         // v2 也发布 → 最新为已发布 v2，无草稿
         var save = await PostSaveAsync(v1RowId, new { root = CreateValidCanvas("pub2") });
         var v2RowId = await ReadLongAsync(save);
-        await SeedDebugSuccessAsync(definitionId, v2RowId);
         await EnsureSuccessAsync(await PostPublishAsync(v2RowId, new { root = CreateValidCanvas("pub2"), publishedNote = "发布" }));
 
         // 回滚到 v1 → 生成 v3 草稿
@@ -276,7 +273,6 @@ internal class WorkflowDefinitionCacheTest : WorkflowDefinitionTestBase
         var definitionId = $"WF_{Guid.NewGuid():N}";
         var v1RowId = await CreateDefinitionAsync(workspaceId, 0, definitionId);
         await EnsureSuccessAsync(await PostSaveAsync(v1RowId, new { root = CreateValidCanvas("pub1") }));
-        await SeedDebugSuccessAsync(definitionId, v1RowId);
         await EnsureSuccessAsync(await PostPublishAsync(v1RowId, new { root = CreateValidCanvas("pub1"), publishedNote = "发布" }));
         var save = await PostSaveAsync(v1RowId, new { root = CreateValidCanvas("mv2") });
         await EnsureSuccessAsync(save);

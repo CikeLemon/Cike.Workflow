@@ -123,9 +123,6 @@ public class WorkflowDefinitionCommandHandler(
 
         var latest = await GetLatestAsync(entity.DefinitionId, cancellationToken);
 
-        // 发布门禁：保证"发布即所调"（未调试 / 未成功 / 调试后已变更 均拒绝）
-        await debugRunGuard.EnsurePublishableAsync(latest, cancellationToken);
-
         var note = command.PublishedNote ?? string.Empty;
         var row = await PersistDraftAsync(latest, data, command.Options, row =>
         {

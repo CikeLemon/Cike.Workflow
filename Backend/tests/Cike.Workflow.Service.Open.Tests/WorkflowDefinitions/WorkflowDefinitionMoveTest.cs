@@ -41,7 +41,6 @@ internal class WorkflowDefinitionMoveTest : WorkflowDefinitionTestBase
             options,
         });
         await EnsureSuccessAsync(saveWithVariables);
-        await SeedDebugSuccessAsync(definitionId, rowId);
         await EnsureSuccessAsync(await PostPublishAsync(rowId, new
         {
             root = CreateValidCanvas("opt"),

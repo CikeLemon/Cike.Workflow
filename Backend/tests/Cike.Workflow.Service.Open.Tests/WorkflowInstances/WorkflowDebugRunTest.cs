@@ -5,7 +5,7 @@ using Cike.Workflow.Service.Open.Tests.WorkflowDefinitions;
 namespace Cike.Workflow.Service.Open.Tests.WorkflowInstances;
 
 /// <summary>
-/// 调试（试跑）全链路：发起调试、实例可见性、调试锁定（保存/回滚/删除禁令）与发布门禁。
+/// 调试（试跑）全链路：发起调试、实例可见性、保存/回滚放行与删除禁令。
 /// 守卫类用例以直库播种实例作证据（绕过引擎），规则断言一律走 HTTP 行为。
 /// </summary>
 [Category("Integration")]
@@ -43,8 +43,6 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     private async Task<long> PreparePublishedAsync(string prefix = "pub")
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
-        // 发布门禁要求调试证据：播种一条新鲜的调试成功记录
-        await SeedDebugSuccessAsync(definitionId, rowId);
         await EnsureSuccessAsync(await PostPublishAsync(rowId, new { root = CreateValidCanvas(prefix) }));
         return rowId;
     }
@@ -194,72 +192,5 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
         var response = await CreateClient().DeleteAsync($"/api/v1/WorkflowDefinitions/{rowId}");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-    }
-
-    // ---------- 发布门禁 ----------
-
-    [Test]
-    public async Task PublishAsync_WithoutDebugRun_ReturnsBadRequest()
-    {
-        var (definitionId, rowId) = await PrepareDraftAsync();
-
-        var response = await PostPublishAsync(rowId, new { root = CreateValidCanvas("gate1") });
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("尚未调试"));
-    }
-
-    [Test]
-    public async Task PublishAsync_WithFailedDebugRun_ReturnsBadRequest()
-    {
-        var (definitionId, rowId) = await PrepareDraftAsync();
-        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Faulted, DateTime.Now.AddMinutes(1));
-
-        var response = await PostPublishAsync(rowId, new { root = CreateValidCanvas("gate2") });
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("未成功"));
-    }
-
-    [Test]
-    public async Task PublishAsync_WithStaleDebugRun_ReturnsBadRequest()
-    {
-        var (definitionId, rowId) = await PrepareDraftAsync();
-        // 调试证据早于草稿行创建时间：行在调试后有变更
-        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddHours(-1));
-
-        var response = await PostPublishAsync(rowId, new { root = CreateValidCanvas("gate3") });
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("已有变更"));
-    }
-
-    [Test]
-    public async Task PublishAsync_WhenSavedAfterDebugRun_ReturnsBadRequest()
-    {
-        var (definitionId, rowId) = await PrepareDraftAsync();
-        // 证据取当前时刻（晚于建行）；随后的真实保存经审计刷新行 UpdatedAt，必然晚于证据
-        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now);
-
-        // 保存不被调试拦截，但会顶掉行更新时间 → 调试证据过期 → 发布必须重调（"改 → 存 → 调 → 存 → 发布被拦"闭环）
-        await EnsureSuccessAsync(await PostSaveCanvasAsync(rowId, "gate5"));
-
-        var response = await PostPublishAsync(rowId, new { root = CreateValidCanvas("gate5") });
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("已有变更"));
-    }
-
-    [Test]
-    public async Task PublishAsync_WithFreshDebugRun_Publishes()
-    {
-        var (definitionId, rowId) = await PrepareDraftAsync();
-        await SeedDebugSuccessAsync(definitionId, rowId);
-
-        var response = await PostPublishAsync(rowId, new { root = CreateValidCanvas("gate4") });
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-        var detail = (await GetDetailAsync(rowId)).RootElement;
-        Assert.That(GetBool(detail, "isPublished"), Is.True);
     }
 }

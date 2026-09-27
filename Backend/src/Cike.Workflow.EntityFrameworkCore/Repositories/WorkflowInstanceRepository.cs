@@ -47,14 +47,6 @@ public class WorkflowInstanceRepository(CikeWorkflowDbContext context, IWorkflow
         return await query.ToListAsync(cancellationToken);
     }
 
-    public ValueTask<WorkflowInstance?> FindLatestDebugRunAsync(string definitionId, long definitionVersionRowId, CancellationToken cancellationToken = default)
-    {
-        return new(GetQueryable()
-            .Where(x => x.DefinitionId == definitionId && x.DefinitionVersionId == definitionVersionRowId && x.IsDebug)
-            .OrderByDescending(x => x.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken));
-    }
-
     public async Task<(long Total, List<WorkflowInstance> Items)> GetPagedListAsync(WorkflowInstanceFilter filter, string? sorting, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         var query = filter.Apply(GetQueryable()).AsNoTracking();
