@@ -13,17 +13,6 @@ public class WorkflowDebugRunGuard(IWorkflowInstanceRepository workflowInstanceR
     /// <summary>实例终态集合：Finished / Cancelled / Faulted 之外都视为仍在运行（Interrupted 保守按运行中处理）。</summary>
     private static readonly WorkflowStatus[] TerminalStatuses = [WorkflowStatus.Finished, WorkflowStatus.Cancelled, WorkflowStatus.Faulted];
 
-    /// <summary>
-    /// 草稿行最新一次调试实例仍在运行时抛出：调试期间草稿内容不可变更。
-    /// 判定只看最新一条（并发调试允许发起，旧调试卡死时重跑新的、或等新的到终态即解锁）。
-    /// </summary>
-    public async Task EnsureNoActiveDebugRunAsync(string definitionId, long definitionVersionRowId, CancellationToken cancellationToken = default)
-    {
-        var latest = await FindLatestDebugRunAsync(definitionId, definitionVersionRowId, cancellationToken);
-        if (latest != null && !TerminalStatuses.Contains(latest.Status))
-            throw new UserFriendlyException("该草稿存在进行中的调试运行，请等待其结束或取消调试后再操作。");
-    }
-
     /// <summary>取草稿行最新一次调试实例（按创建时间倒序，数据库端截断），无则返回 null。</summary>
     public ValueTask<WorkflowInstance?> FindLatestDebugRunAsync(string definitionId, long definitionVersionRowId, CancellationToken cancellationToken = default)
         => workflowInstanceRepository.FindLatestDebugRunAsync(definitionId, definitionVersionRowId, cancellationToken);

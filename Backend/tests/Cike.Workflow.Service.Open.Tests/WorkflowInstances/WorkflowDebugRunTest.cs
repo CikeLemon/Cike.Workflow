@@ -125,29 +125,16 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
         Assert.That(GetInstanceStatus(items[1]), Is.EqualTo(nameof(WorkflowStatus.Finished)));
     }
 
-    // ---------- 调试锁定：保存 / 回滚 / 删除 ----------
+    // ---------- 保存 / 回滚不拦调试运行，删除禁令 ----------
 
     [Test]
-    public async Task SaveAsync_WithActiveDebugRun_ReturnsBadRequest()
+    public async Task SaveAsync_WhileDebugRunning_Succeeds()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Executing);
 
-        var response = await PostSaveCanvasAsync(rowId, "lock_save");
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("调试"));
-    }
-
-    [Test]
-    public async Task SaveAsync_WithLatestDebugRunTerminal_SucceedsDespiteOlderRunning()
-    {
-        var (definitionId, rowId) = await PrepareDraftAsync();
-        // 旧调试卡死（运行中），但最新一条已到终态：以最新一条判定，保存放行
-        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Suspended, DateTime.Now.AddHours(-2));
-        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddHours(-1));
-
-        var response = await PostSaveCanvasAsync(rowId, "lock_latest_save");
+        // 前端流程是"改 → 存 → 调"：保存不被调试运行拦截，已有调试证据由时间戳过期
+        var response = await PostSaveCanvasAsync(rowId, "save_during_debug");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
     }
@@ -169,18 +156,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
-    public async Task SaveAsync_WithTerminalDebugRun_Succeeds()
-    {
-        var (definitionId, rowId) = await PrepareDraftAsync();
-        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished);
-
-        var response = await PostSaveCanvasAsync(rowId, "lockok_save");
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-    }
-
-    [Test]
-    public async Task RollbackAsync_WithActiveDebugRun_ReturnsBadRequest()
+    public async Task RollbackAsync_WhileDebugRunning_Succeeds()
     {
         var (definitionId, firstRowId) = await PrepareDraftAsync();
         await SeedInstanceAsync(definitionId, firstRowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddMinutes(1));
@@ -193,8 +169,7 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
         var response = await CreateClient().PostAsJsonAsync("/api/v1/WorkflowDefinitions/Rollback",
             new { definitionId, definitionVersionId = firstRowId });
 
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("调试"));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
     }
 
     [Test]
@@ -254,6 +229,22 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
         await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddHours(-1));
 
         var response = await PostPublishAsync(rowId, new { root = CreateValidCanvas("gate3") });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("已有变更"));
+    }
+
+    [Test]
+    public async Task PublishAsync_WhenSavedAfterDebugRun_ReturnsBadRequest()
+    {
+        var (definitionId, rowId) = await PrepareDraftAsync();
+        // 证据取当前时刻（晚于建行）；随后的真实保存经审计刷新行 UpdatedAt，必然晚于证据
+        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now);
+
+        // 保存不被调试拦截，但会顶掉行更新时间 → 调试证据过期 → 发布必须重调（"改 → 存 → 调 → 存 → 发布被拦"闭环）
+        await EnsureSuccessAsync(await PostSaveCanvasAsync(rowId, "gate5"));
+
+        var response = await PostPublishAsync(rowId, new { root = CreateValidCanvas("gate5") });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
         Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("已有变更"));

@@ -79,10 +79,8 @@ public class WorkflowDefinitionCommandHandler(
 
         var latest = await GetLatestAsync(entity.DefinitionId, cancellationToken);
 
-        // 调试锁定：保存会就地覆盖草稿内容，草稿上还有未终态调试实例时拒绝
-        if (!latest.IsPublished)
-            await debugRunGuard.EnsureNoActiveDebugRunAsync(latest.DefinitionId, latest.Id, cancellationToken);
-
+        // 保存不被调试运行拦截（前端流程是"改 → 存 → 调"）；保存顶掉行 UpdatedAt，
+        // 已有调试证据自动过期，发布门禁会要求重新调试
         var row = await PersistDraftAsync(latest, data, command.Dto.Options, null, cancellationToken);
         command.DraftId = row.Id;
     }
@@ -182,9 +180,7 @@ public class WorkflowDefinitionCommandHandler(
 
         if (!latest.IsPublished)
         {
-            // 调试锁定：回滚会就地覆盖草稿内容，草稿上还有未终态调试实例时拒绝
-            await debugRunGuard.EnsureNoActiveDebugRunAsync(latest.DefinitionId, latest.Id, cancellationToken);
-
+            // 回滚与保存同理不被调试运行拦截：内容变更即令调试证据过期，由发布门禁兜底
             // 有未发布草稿：用目标版本的画布内容覆盖草稿，版本号不变（原草稿内容丢弃——已接受的取舍）
             latest.OriginalStringData = target.OriginalStringData;
             latest.Options = target.Options;

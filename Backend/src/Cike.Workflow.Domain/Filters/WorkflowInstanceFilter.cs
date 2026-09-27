@@ -51,6 +51,8 @@ public class WorkflowInstanceFilter
     /// </summary>
     public long? DefinitionVersionId { get; set; }
 
+    public long? WorkspaceId { get; set; }
+
     /// <summary>
     /// Filter workflow instances by definition IDs.
     /// </summary>
@@ -60,6 +62,8 @@ public class WorkflowInstanceFilter
     /// Filter workflow instances by definition version IDs.
     /// </summary>
     public ICollection<long>? DefinitionVersionIds { get; set; }
+
+    public ICollection<long>? WorkspaceIds { get; set; }
 
     /// <summary>
     /// Filter workflow instances by version.
@@ -148,8 +152,10 @@ public class WorkflowInstanceFilter
         if (filter.Ids != null) query = query.Where(x => filter.Ids.Contains(x.Id));
         if (!string.IsNullOrWhiteSpace(filter.DefinitionId)) query = query.Where(x => x.DefinitionId == filter.DefinitionId);
         if (filter.DefinitionVersionId.HasValue) query = query.Where(x => x.DefinitionVersionId == filter.DefinitionVersionId);
+        if (filter.WorkspaceId.HasValue) query = query.Where(x => x.WorkspaceId == filter.WorkspaceId);
         if (filter.DefinitionIds != null) query = query.Where(x => filter.DefinitionIds.Contains(x.DefinitionId));
         if (filter.DefinitionVersionIds != null) query = query.Where(x => filter.DefinitionVersionIds.Contains(x.DefinitionVersionId));
+        if (filter.WorkspaceIds != null) query = query.Where(x => filter.WorkspaceIds.Contains(x.WorkspaceId));
         if (filter.Version != null) query = query.Where(x => x.Version == filter.Version);
         if (filter.ParentWorkflowInstanceIds != null) query = query.Where(x => x.ParentWorkflowInstanceId > 0 && filter.ParentWorkflowInstanceIds.Contains(x.ParentWorkflowInstanceId));
         if (!string.IsNullOrWhiteSpace(filter.CorrelationId)) query = query.Where(x => x.CorrelationId == filter.CorrelationId);
