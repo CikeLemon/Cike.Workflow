@@ -140,6 +140,35 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
     }
 
     [Test]
+    public async Task SaveAsync_WithLatestDebugRunTerminal_SucceedsDespiteOlderRunning()
+    {
+        var (definitionId, rowId) = await PrepareDraftAsync();
+        // 旧调试卡死（运行中），但最新一条已到终态：以最新一条判定，保存放行
+        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Suspended, DateTime.Now.AddHours(-2));
+        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Finished, DateTime.Now.AddHours(-1));
+
+        var response = await PostSaveCanvasAsync(rowId, "lock_latest_save");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task RunDebugAsync_WithRunningDebugRun_StartsAnotherConcurrently()
+    {
+        var (definitionId, rowId) = await PrepareDraftAsync();
+        await EnsureSuccessAsync(await PostSaveCanvasAsync(rowId, "concurrent"));
+        await SeedInstanceAsync(definitionId, rowId, isDebug: true, WorkflowStatus.Executing);
+
+        var response = await PostDebugRunAsync(rowId);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var instanceId = await ReadLongAsync(response);
+        Assert.That(instanceId, Is.GreaterThan(0));
+        var detail = await WaitUntilAsync(() => TryGetInstanceAsync(instanceId));
+        Assert.That(GetBool(detail!.RootElement, "isDebug"), Is.True);
+    }
+
+    [Test]
     public async Task SaveAsync_WithTerminalDebugRun_Succeeds()
     {
         var (definitionId, rowId) = await PrepareDraftAsync();
