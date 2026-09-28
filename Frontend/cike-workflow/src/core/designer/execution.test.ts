@@ -7,6 +7,7 @@ import {
   type ExecutionRecordLike,
   type ProgressEvent,
 } from "./execution"
+import type { ActivityStatus } from "@/api/generated"
 
 describe("execution", () => {
   it("BuildStatusMap_MapsByActivityId", () => {
@@ -75,21 +76,21 @@ describe("getLatestRecord", () => {
 
 describe("applyProgressEvent", () => {
   it("ActivityStarted sets status to Running (1)", () => {
-    const map = new Map<string, number>()
+    const map = new Map<string, ActivityStatus>()
     const event: ProgressEvent = { type: 0, activityNodeId: "fc-root:a-http" }
     const next = applyProgressEvent(map, event)
     expect(next.get("a-http")).toBe(1)
   })
 
   it("ActivityCompleted sets status to Completed (2)", () => {
-    const map = new Map<string, number>([["a-http", 1]])
+    const map = new Map<string, ActivityStatus>([["a-http", 1]])
     const event: ProgressEvent = { type: 1, activityNodeId: "fc-root:a-http" }
     const next = applyProgressEvent(map, event)
     expect(next.get("a-http")).toBe(2)
   })
 
   it("ActivitySuspended sets status to Running (1) with suspended flag", () => {
-    const map = new Map<string, number>()
+    const map = new Map<string, ActivityStatus>()
     const event: ProgressEvent = { type: 2, activityNodeId: "fc-root:a-approval" }
     const next = applyProgressEvent(map, event)
     // Suspended maps to Running(1) in ActivityStatus enum; the UI distinguishes via event type
@@ -97,28 +98,28 @@ describe("applyProgressEvent", () => {
   })
 
   it("ActivityFaulted sets status to Faulted (4)", () => {
-    const map = new Map<string, number>([["a-http", 1]])
+    const map = new Map<string, ActivityStatus>([["a-http", 1]])
     const event: ProgressEvent = { type: 3, activityNodeId: "fc-root:a-http" }
     const next = applyProgressEvent(map, event)
     expect(next.get("a-http")).toBe(4)
   })
 
   it("ignores events without activityNodeId", () => {
-    const map = new Map<string, number>([["a-x", 2]])
+    const map = new Map<string, ActivityStatus>([["a-x", 2]])
     const event: ProgressEvent = { type: 0, activityNodeId: null }
     const next = applyProgressEvent(map, event)
     expect(next).toBe(map) // same reference, no mutation
   })
 
   it("ignores workflow-level terminal events (type >= 4)", () => {
-    const map = new Map<string, number>([["a-x", 2]])
+    const map = new Map<string, ActivityStatus>([["a-x", 2]])
     const event: ProgressEvent = { type: 4, activityNodeId: "fc-root:a-x" }
     const next = applyProgressEvent(map, event)
     expect(next).toBe(map)
   })
 
   it("does not mutate the original map", () => {
-    const map = new Map<string, number>([["a-http", 1]])
+    const map = new Map<string, ActivityStatus>([["a-http", 1]])
     const event: ProgressEvent = { type: 1, activityNodeId: "a-http" }
     applyProgressEvent(map, event)
     expect(map.get("a-http")).toBe(1) // original unchanged
