@@ -77,6 +77,8 @@ function formatDateTime(value?: string): string {
   if (!value) return "—"
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return "—"
+  // .NET DateTime.MinValue (0001-01-01) is the backend sentinel for "not finished".
+  if (d.getFullYear() <= 1) return "—"
   return d.toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
 }
 
