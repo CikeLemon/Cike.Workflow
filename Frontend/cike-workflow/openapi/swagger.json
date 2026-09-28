@@ -342,6 +342,42 @@
         }
       }
     },
+    "/api/v1/WorkflowDefinitions/OptionList": {
+      "get": {
+        "tags": [
+          "WorkflowDefinitionService"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorkflowDefinitionOptionDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
     "/api/v1/WorkflowDefinitions/{id}": {
       "get": {
         "tags": [
@@ -812,6 +848,32 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/api/v1/WorkflowInstances/Cancel/{id}": {
+      "post": {
+        "tags": [
+          "WorkflowInstanceService"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           },
           "400": {
             "description": "Bad Request"
@@ -2209,6 +2271,18 @@
           }
         ]
       },
+      "WorkflowDefinitionOptionDto": {
+        "type": "object",
+        "properties": {
+          "definitionId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "WorkflowDefinitionOptionsValueObject": {
         "type": "object",
         "properties": {
@@ -2410,6 +2484,11 @@
             "format": "int64",
             "nullable": true
           },
+          "workspaceId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
           "definitionIds": {
             "type": "array",
             "items": {
@@ -2418,6 +2497,14 @@
             "nullable": true
           },
           "definitionVersionIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "workspaceIds": {
             "type": "array",
             "items": {
               "type": "integer",

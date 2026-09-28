@@ -397,6 +397,11 @@ export type WorkflowDefinitionItemDto = WorkflowDefinitionFolderBaseDto & {
     materializerName?: string;
 };
 
+export type WorkflowDefinitionOptionDto = {
+    definitionId?: string;
+    name?: string;
+};
+
 export type WorkflowDefinitionOptionsValueObject = {
     variables?: Array<VariableDefinition>;
     inputs?: Array<InputDefinition>;
@@ -454,8 +459,10 @@ export type WorkflowInstanceFilter = {
     name?: string | null;
     definitionId?: string | null;
     definitionVersionId?: string | null;
+    workspaceId?: string | null;
     definitionIds?: Array<string> | null;
     definitionVersionIds?: Array<string> | null;
+    workspaceIds?: Array<string> | null;
     version?: number | null;
     parentWorkflowInstanceIds?: Array<string> | null;
     correlationId?: string | null;
@@ -808,6 +815,31 @@ export type GetApiV1WorkflowDefinitionsListResponses = {
 
 export type GetApiV1WorkflowDefinitionsListResponse = GetApiV1WorkflowDefinitionsListResponses[keyof GetApiV1WorkflowDefinitionsListResponses];
 
+export type GetApiV1WorkflowDefinitionsOptionListData = {
+    body?: never;
+    path?: never;
+    query: {
+        workspaceId: string;
+    };
+    url: '/api/v1/WorkflowDefinitions/OptionList';
+};
+
+export type GetApiV1WorkflowDefinitionsOptionListErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+};
+
+export type GetApiV1WorkflowDefinitionsOptionListResponses = {
+    /**
+     * OK
+     */
+    200: Array<WorkflowDefinitionOptionDto>;
+};
+
+export type GetApiV1WorkflowDefinitionsOptionListResponse = GetApiV1WorkflowDefinitionsOptionListResponses[keyof GetApiV1WorkflowDefinitionsOptionListResponses];
+
 export type DeleteApiV1WorkflowDefinitionsByIdData = {
     body?: never;
     path: {
@@ -1120,6 +1152,29 @@ export type PostApiV1WorkflowInstancesDebugRunByIdResponses = {
 };
 
 export type PostApiV1WorkflowInstancesDebugRunByIdResponse = PostApiV1WorkflowInstancesDebugRunByIdResponses[keyof PostApiV1WorkflowInstancesDebugRunByIdResponses];
+
+export type PostApiV1WorkflowInstancesCancelByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/WorkflowInstances/Cancel/{id}';
+};
+
+export type PostApiV1WorkflowInstancesCancelByIdErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+};
+
+export type PostApiV1WorkflowInstancesCancelByIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type GetApiV1WorkflowInstancesLogsByIdData = {
     body?: never;
