@@ -59,6 +59,17 @@ public class WorkflowDefinitionQueryHandler(ICacheService<FolderCacheModel> fold
         }
     }
 
+    /// <summary>下拉选项数据源（实例列表筛选）：按空间取最新版定义行，只投影 DefinitionId + Name，每定义一项。</summary>
+    [LocalEventHandler]
+    public async Task GetOptionListAsync(GetWorkflowDefinitionOptionListQuery query, CancellationToken cancellationToken = default)
+    {
+        using var _ = workflowDefinitionRepository.BeginAsNoTracking();
+        var latestWorkflows = await workflowDefinitionRepository.GetListAsync(
+            x => x.WorkspaceId == query.WorkspaceId && x.IsLatest, "Name asc", cancellationToken);
+
+        query.Result = latestWorkflows.Adapt<List<WorkflowDefinitionOptionDto>>();
+    }
+
     [LocalEventHandler]
     public async Task GetAsync(GetWorkflowDefinitionQuery query, CancellationToken cancellationToken)
     {

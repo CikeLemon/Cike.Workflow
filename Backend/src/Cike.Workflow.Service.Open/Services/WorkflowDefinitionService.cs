@@ -24,6 +24,17 @@ public class WorkflowDefinitionService : MinimalApiServiceBase
         return TypedResults.Ok(query.Result);
     }
 
+    /// <summary>按空间取全部工作流定义的 DefinitionId + Name，作为实例列表筛选下拉的数据源。</summary>
+    public async Task<Results<Ok<List<WorkflowDefinitionOptionDto>>, BadRequest>> GetOptionListAsync(
+        [FromServices] ILocalEventBus localEventBus,
+        long workspaceId,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new GetWorkflowDefinitionOptionListQuery(workspaceId);
+        await localEventBus.PublishAsync(query, cancellationToken);
+        return TypedResults.Ok(query.Result);
+    }
+
     public async Task<Results<Ok<WorkflowDefinitionDetailDto>, BadRequest>> GetAsync(
         [FromServices] ILocalEventBus localEventBus,
         long id,
