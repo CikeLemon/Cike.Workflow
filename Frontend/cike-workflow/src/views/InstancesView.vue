@@ -348,17 +348,22 @@ onMounted(() => {
               </TableCell>
               <TableCell class="font-mono text-xs text-muted-foreground">{{ inst.correlationId || "—" }}</TableCell>
               <TableCell>
-                <button
-                  v-if="inst.definitionId"
-                  type="button"
-                  class="text-left font-medium hover:text-primary hover:underline"
-                  @click="selectDefinition(inst.definitionId)"
-                >
-                  {{ inst.definitionName || inst.definitionId }}
-                </button>
-                <span v-else class="text-muted-foreground">—</span>
+                <div class="flex items-center gap-1.5">
+                  <button
+                    v-if="inst.definitionId"
+                    type="button"
+                    class="text-left font-medium hover:text-primary hover:underline"
+                    @click="selectDefinition(inst.definitionId)"
+                  >
+                    {{ inst.definitionName || inst.definitionId }}
+                  </button>
+                  <span v-else class="text-muted-foreground">—</span>
+                  <span v-if="inst.definitionId" class="font-mono text-xs text-muted-foreground">
+                    v{{ inst.version ?? 0 }}
+                  </span>
+                </div>
                 <div v-if="inst.definitionId" class="font-mono text-xs text-muted-foreground">
-                  {{ inst.definitionId }} · v{{ inst.version ?? 0 }}
+                  {{ inst.definitionId }}
                 </div>
               </TableCell>
               <TableCell>
