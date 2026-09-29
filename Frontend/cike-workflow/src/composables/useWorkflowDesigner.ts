@@ -195,7 +195,13 @@ export function useWorkflowDesigner() {
     return map
   })
 
+  // Monotonic sequence guard: rapid version/definition switches fire overlapping load
+  // calls; only the latest may write designer state, so an older version's late response
+  // can't clobber the one now on screen. (Mirrors the existing validationSeq pattern.)
+  let loadSeq = 0
+
   async function load(definitionRowId: string): Promise<void> {
+    const seq = ++loadSeq
     loading.value = true
     loadError.value = null
     // A reload supersedes any in-flight edit validation and clears stale results
@@ -208,6 +214,7 @@ export function useWorkflowDesigner() {
     validationError.value = null
     try {
       const { data, error } = await getApiV1WorkflowDefinitionsById({ path: { id: definitionRowId } })
+      if (seq !== loadSeq) return // stale — a newer load owns the designer state
       if (error || !data) {
         loadError.value = extractApiErrorMessage(error, "加载定义失败")
         return
@@ -243,7 +250,7 @@ export function useWorkflowDesigner() {
       // problems surface immediately. No-op in readonly mode.
       void validate()
     } finally {
-      loading.value = false
+      if (seq === loadSeq) loading.value = false
     }
   }
 

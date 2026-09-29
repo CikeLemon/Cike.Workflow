@@ -57,7 +57,13 @@ const currentFolderId = computed(
 
 const isRootFolder = computed(() => currentFolderId.value === ROOT_FOLDER_ID)
 
+// Monotonic sequence guard: rapid folder switches / searches fire overlapping fetchList
+// calls; only the latest may write `items`, so an older folder's late response can't
+// clobber the current folder's list.
+let listFetchSeq = 0
+
 async function fetchList() {
+  const seq = ++listFetchSeq
   loading.value = true
   loadError.value = false
   try {
@@ -68,13 +74,14 @@ async function fetchList() {
         keyword: keyword.value || undefined,
       },
     })
+    if (seq !== listFetchSeq) return // stale — a newer fetchList owns the state
     if (error) {
       loadError.value = true
       return
     }
     items.value = data ?? []
   } finally {
-    loading.value = false
+    if (seq === listFetchSeq) loading.value = false
   }
 }
 

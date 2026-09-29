@@ -52,7 +52,13 @@ const page = ref(1)
 const pageSize = ref(12)
 const hasMore = computed(() => workspaces.value.length < total.value)
 
+// Monotonic sequence guard: only the latest in-flight fetch may write state, so a
+// search reload racing an infinite-scroll append (or overlapping searches) can't be
+// clobbered by a stale response, and the stale call leaves loading flags to the newer one.
+let wsFetchSeq = 0
+
 async function fetchWorkspaces(append = false) {
+  const seq = ++wsFetchSeq
   if (append) loadingMore.value = true
   else loading.value = true
   loadError.value = false
@@ -64,6 +70,7 @@ async function fetchWorkspaces(append = false) {
         PageSize: pageSize.value,
       },
     })
+    if (seq !== wsFetchSeq) return // stale — a newer fetch owns state & loading flags
     if (error) {
       loadError.value = true
       return
@@ -72,8 +79,10 @@ async function fetchWorkspaces(append = false) {
     workspaces.value = append ? [...workspaces.value, ...items] : items
     total.value = Number(data?.total ?? 0)
   } finally {
-    loading.value = false
-    loadingMore.value = false
+    if (seq === wsFetchSeq) {
+      loading.value = false
+      loadingMore.value = false
+    }
   }
 }
 
