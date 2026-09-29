@@ -386,16 +386,21 @@ onMounted(() => {
               </TableCell>
               <TableCell>
                 <div class="flex items-center gap-1.5">
-                  <button
-                    v-if="inst.definitionId"
-                    type="button"
-                    class="max-w-[200px] truncate text-left font-medium hover:text-primary hover:underline"
+                  <RouterLink
+                    v-if="inst.definitionVersionId"
+                    :to="`/workspaces/${workspaceId}/definitions/${inst.definitionVersionId}`"
+                    class="max-w-[200px] truncate font-medium hover:text-primary hover:underline"
                     :title="inst.definitionName || inst.definitionId"
-                    @click="selectDefinition(inst.definitionId)"
                   >
                     {{ inst.definitionName || inst.definitionId }}
-                  </button>
-                  <span v-else class="text-muted-foreground">—</span>
+                  </RouterLink>
+                  <span
+                    v-else
+                    class="max-w-[200px] truncate"
+                    :title="inst.definitionName || inst.definitionId"
+                  >
+                    {{ inst.definitionName || inst.definitionId || "—" }}
+                  </span>
                   <span v-if="inst.definitionId" class="shrink-0 font-mono text-xs text-muted-foreground">
                     v{{ inst.version ?? 0 }}
                   </span>
