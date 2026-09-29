@@ -89,6 +89,13 @@ function formatDateTime(value?: string): string {
   return d.toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
 }
 
+// Instance name is an optional run label (usually empty); fall back to a short id so
+// every row keeps a meaningful, clickable identity instead of duplicating the definition.
+function instanceLabel(inst: { name?: string; id?: string }): string {
+  if (inst.name) return inst.name
+  return inst.id ? `实例 #${inst.id.slice(-6)}` : "实例"
+}
+
 function isSubWorkflow(parentId?: string): boolean {
   return !!parentId && parentId !== "0"
 }
@@ -266,11 +273,11 @@ onMounted(() => {
       <Table>
         <TableHeader>
           <TableRow class="bg-muted/50 hover:bg-muted/50">
-            <TableHead>名称 / 定义</TableHead>
-            <TableHead>状态</TableHead>
-            <TableHead>版本</TableHead>
+            <TableHead>实例名称</TableHead>
             <TableHead>关联 ID</TableHead>
+            <TableHead>工作流定义</TableHead>
             <TableHead>异常</TableHead>
+            <TableHead>状态</TableHead>
             <TableHead>创建时间</TableHead>
             <TableHead>完成时间</TableHead>
             <TableHead>操作</TableHead>
@@ -313,11 +320,11 @@ onMounted(() => {
         <Table>
           <TableHeader>
             <TableRow class="bg-muted/50 hover:bg-muted/50">
-              <TableHead>名称 / 定义</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead>版本</TableHead>
+              <TableHead>实例名称</TableHead>
               <TableHead>关联 ID</TableHead>
+              <TableHead>工作流定义</TableHead>
               <TableHead>异常</TableHead>
+              <TableHead>状态</TableHead>
               <TableHead>创建时间</TableHead>
               <TableHead>完成时间</TableHead>
               <TableHead>操作</TableHead>
@@ -331,30 +338,35 @@ onMounted(() => {
                     :to="`/workspaces/${workspaceId}/instances/${inst.id}`"
                     class="font-medium hover:text-primary"
                   >
-                    {{ inst.name || inst.definitionName || `实例 ${inst.id}` }}
+                    {{ instanceLabel(inst) }}
                   </RouterLink>
+                  <Badge v-if="inst.isDebug" variant="outline" class="text-xs">调试</Badge>
                   <Badge v-if="isSubWorkflow(inst.parentWorkflowInstanceId)" variant="outline" class="text-xs">
                     子流程
                   </Badge>
-                  <Badge v-if="inst.isDebug" variant="outline" class="text-xs">调试</Badge>
                 </div>
+              </TableCell>
+              <TableCell class="font-mono text-xs text-muted-foreground">{{ inst.correlationId || "—" }}</TableCell>
+              <TableCell>
                 <button
                   v-if="inst.definitionId"
                   type="button"
-                  class="text-xs text-muted-foreground hover:text-primary hover:underline"
+                  class="text-left font-medium hover:text-primary hover:underline"
                   @click="selectDefinition(inst.definitionId)"
                 >
                   {{ inst.definitionName || inst.definitionId }}
                 </button>
+                <span v-else class="text-muted-foreground">—</span>
+                <div v-if="inst.definitionId" class="font-mono text-xs text-muted-foreground">
+                  {{ inst.definitionId }} · v{{ inst.version ?? 0 }}
+                </div>
               </TableCell>
-              <TableCell>
-                <Badge :class="statusClass(inst.status)">{{ statusLabel(inst.status) }}</Badge>
-              </TableCell>
-              <TableCell class="font-mono text-xs">v{{ inst.version ?? 0 }}</TableCell>
-              <TableCell class="font-mono text-xs text-muted-foreground">{{ inst.correlationId || "—" }}</TableCell>
               <TableCell>
                 <Badge v-if="(inst.incidentCount ?? 0) > 0" variant="destructive">{{ inst.incidentCount }}</Badge>
                 <span v-else class="text-muted-foreground">—</span>
+              </TableCell>
+              <TableCell>
+                <Badge :class="statusClass(inst.status)">{{ statusLabel(inst.status) }}</Badge>
               </TableCell>
               <TableCell class="text-xs text-muted-foreground">{{ formatDateTime(inst.createdAt) }}</TableCell>
               <TableCell class="text-xs text-muted-foreground">{{ formatDateTime(inst.finishedAt) }}</TableCell>
