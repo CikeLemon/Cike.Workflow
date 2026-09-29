@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
 import { RouterLink, useRoute } from "vue-router"
-import { RefreshCw, Inbox, TriangleAlert, ChevronLeft, ChevronRight, ChevronDown, Search, SearchX } from "@lucide/vue"
+import { RefreshCw, Inbox, TriangleAlert, ChevronLeft, ChevronRight, ChevronDown, Search, SearchX, X } from "@lucide/vue"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -106,6 +106,11 @@ function commitSearch(): void {
   list.searchTerm.value = searchInput.value
   void list.applyFilters()
 }
+function clearSearch(): void {
+  searchInput.value = ""
+  list.searchTerm.value = ""
+  void list.applyFilters()
+}
 watch(() => list.searchTerm.value, (v) => { searchInput.value = v })
 
 // --- definition combobox ---
@@ -119,6 +124,11 @@ function selectDefinition(id: string): void {
   if (!id) return
   const current = list.selectedDefinitionIds.value
   list.setDefinitionFilter(current.includes(id) ? [] : [id])
+  defOpen.value = false
+  void list.applyFilters()
+}
+function clearDefinitionFilter(): void {
+  list.setDefinitionFilter([])
   defOpen.value = false
   void list.applyFilters()
 }
@@ -186,9 +196,18 @@ onMounted(() => {
         <Input
           v-model="searchInput"
           placeholder="搜索实例名称、关联 ID 或实例 ID…"
-          class="pl-9"
+          class="pl-9 pr-9"
           @keyup.enter="commitSearch"
         />
+        <button
+          v-if="searchInput"
+          type="button"
+          aria-label="清除搜索"
+          class="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground"
+          @click="clearSearch"
+        >
+          <X :size="16" />
+        </button>
       </div>
 
       <Popover v-model:open="defOpen">
@@ -206,6 +225,11 @@ onMounted(() => {
             <CommandList>
               <CommandEmpty>无匹配定义</CommandEmpty>
               <CommandGroup>
+                <CommandItem value="全部工作流定义" @select="() => clearDefinitionFilter()">
+                  全部工作流定义
+                </CommandItem>
+              </CommandGroup>
+              <CommandGroup>
                 <CommandItem
                   v-for="opt in list.definitionOptions.value"
                   :key="opt.definitionId"
@@ -221,6 +245,15 @@ onMounted(() => {
       </Popover>
 
       <div class="ml-auto flex items-center gap-3">
+        <Button
+          v-if="list.hasActiveFilters.value"
+          variant="ghost"
+          size="sm"
+          class="text-muted-foreground"
+          @click="list.clearFilters()"
+        >
+          清除筛选
+        </Button>
         <span class="text-sm text-muted-foreground">共 {{ list.total.value }} 个</span>
         <Button variant="outline" size="sm" :disabled="list.loading.value" @click="list.refresh()">
           <RefreshCw :size="16" :class="list.loading.value ? 'animate-spin' : ''" />
@@ -269,7 +302,7 @@ onMounted(() => {
     </div>
 
     <!-- Loading skeleton -->
-    <div v-else-if="list.loading.value" class="rounded-lg border">
+    <div v-else-if="list.loading.value" class="rounded-lg border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow class="bg-muted/50 hover:bg-muted/50">
@@ -316,7 +349,7 @@ onMounted(() => {
 
     <!-- Instance table -->
     <template v-else>
-      <div class="rounded-lg border">
+      <div class="rounded-lg border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow class="bg-muted/50 hover:bg-muted/50">
@@ -346,23 +379,32 @@ onMounted(() => {
                   </Badge>
                 </div>
               </TableCell>
-              <TableCell class="font-mono text-xs text-muted-foreground">{{ inst.correlationId || "—" }}</TableCell>
+              <TableCell class="font-mono text-xs text-muted-foreground">
+                <div class="max-w-[160px] truncate" :title="inst.correlationId || undefined">
+                  {{ inst.correlationId || "—" }}
+                </div>
+              </TableCell>
               <TableCell>
                 <div class="flex items-center gap-1.5">
                   <button
                     v-if="inst.definitionId"
                     type="button"
-                    class="text-left font-medium hover:text-primary hover:underline"
+                    class="max-w-[200px] truncate text-left font-medium hover:text-primary hover:underline"
+                    :title="inst.definitionName || inst.definitionId"
                     @click="selectDefinition(inst.definitionId)"
                   >
                     {{ inst.definitionName || inst.definitionId }}
                   </button>
                   <span v-else class="text-muted-foreground">—</span>
-                  <span v-if="inst.definitionId" class="font-mono text-xs text-muted-foreground">
+                  <span v-if="inst.definitionId" class="shrink-0 font-mono text-xs text-muted-foreground">
                     v{{ inst.version ?? 0 }}
                   </span>
                 </div>
-                <div v-if="inst.definitionId" class="font-mono text-xs text-muted-foreground">
+                <div
+                  v-if="inst.definitionId"
+                  class="max-w-[200px] truncate font-mono text-xs text-muted-foreground"
+                  :title="inst.definitionId"
+                >
                   {{ inst.definitionId }}
                 </div>
               </TableCell>
