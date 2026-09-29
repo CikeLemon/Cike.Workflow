@@ -336,3 +336,45 @@ describe("useInstancesList — cancel (T4)", () => {
     expect(mockPagedList).not.toHaveBeenCalled()
   })
 })
+
+describe("useInstancesList — fetch lifecycle (review W1/W2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockPagedList.mockResolvedValue(pagedOk([], 0))
+    mockOptionList.mockResolvedValue({ data: [], error: null })
+  })
+
+  it("discards a stale response when a newer fetch is in flight (W1)", async () => {
+    let resolveFirst: (v: unknown) => void = () => {}
+    const first = new Promise<unknown>((r) => {
+      resolveFirst = r
+    })
+    mockPagedList
+      .mockReset()
+      .mockReturnValueOnce(first) // 1st call hangs
+      .mockResolvedValueOnce(pagedOk([{ id: "new" }], 1)) // 2nd resolves first
+
+    const list = useInstancesList(WS)
+    const p1 = list.fetch() // seq 1
+    const p2 = list.fetch() // seq 2
+    await p2
+    resolveFirst({ data: { items: [{ id: "old" }], total: "1" }, error: null })
+    await p1
+
+    // The late (stale) first response must not clobber the newer result.
+    expect(list.items.value).toEqual([{ id: "new" }])
+  })
+
+  it("clamps to the last page and refetches when total shrinks below the current page (W2)", async () => {
+    const list = useInstancesList(WS)
+    mockPagedList.mockResolvedValue(pagedOk([{ id: "x" }], 100)) // totalPages 5
+    await list.fetch()
+    list.page.value = 5 // simulate sitting on page 5
+
+    mockPagedList.mockResolvedValue(pagedOk([], 40)) // shrink → totalPages 2
+    await list.refresh()
+
+    expect(list.page.value).toBe(2)
+    expect(mockPagedList.mock.calls.at(-1)![0].query.Page).toBe(2)
+  })
+})

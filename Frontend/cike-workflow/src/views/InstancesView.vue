@@ -7,6 +7,13 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Command,
@@ -134,6 +141,13 @@ const isDebugModel = computed({
   },
 })
 
+const pageSizeModel = computed({
+  get: () => String(list.pageSize.value),
+  set: (v: string) => {
+    void list.setPageSize(Number(v))
+  },
+})
+
 // --- row cancel (irreversible → confirm gate; async → refetch, no optimistic flip) ---
 const cancelTarget = ref<WorkflowInstanceItemDto | null>(null)
 const cancelOpen = computed({
@@ -252,8 +266,8 @@ onMounted(() => {
       <Table>
         <TableHeader>
           <TableRow class="bg-muted/50 hover:bg-muted/50">
-            <TableHead>状态</TableHead>
             <TableHead>名称 / 定义</TableHead>
+            <TableHead>状态</TableHead>
             <TableHead>版本</TableHead>
             <TableHead>关联 ID</TableHead>
             <TableHead>异常</TableHead>
@@ -299,8 +313,8 @@ onMounted(() => {
         <Table>
           <TableHeader>
             <TableRow class="bg-muted/50 hover:bg-muted/50">
-              <TableHead>状态</TableHead>
               <TableHead>名称 / 定义</TableHead>
+              <TableHead>状态</TableHead>
               <TableHead>版本</TableHead>
               <TableHead>关联 ID</TableHead>
               <TableHead>异常</TableHead>
@@ -311,12 +325,6 @@ onMounted(() => {
           </TableHeader>
           <TableBody>
             <TableRow v-for="inst in list.items.value" :key="inst.id">
-              <TableCell>
-                <div class="flex items-center gap-1.5">
-                  <Badge :class="statusClass(inst.status)">{{ statusLabel(inst.status) }}</Badge>
-                  <Badge v-if="inst.isDebug" variant="outline" class="text-xs">调试</Badge>
-                </div>
-              </TableCell>
               <TableCell>
                 <div class="flex items-center gap-1.5">
                   <RouterLink
@@ -337,6 +345,12 @@ onMounted(() => {
                 >
                   {{ inst.definitionName || inst.definitionId }}
                 </button>
+              </TableCell>
+              <TableCell>
+                <div class="flex items-center gap-1.5">
+                  <Badge :class="statusClass(inst.status)">{{ statusLabel(inst.status) }}</Badge>
+                  <Badge v-if="inst.isDebug" variant="outline" class="text-xs">调试</Badge>
+                </div>
               </TableCell>
               <TableCell class="font-mono text-xs">v{{ inst.version ?? 0 }}</TableCell>
               <TableCell class="font-mono text-xs text-muted-foreground">{{ inst.correlationId || "—" }}</TableCell>
@@ -360,9 +374,26 @@ onMounted(() => {
         </Table>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="list.totalPages.value > 1" class="flex justify-center">
+      <!-- Pagination footer: page-size selector + position + pager -->
+      <div v-if="list.total.value > 0" class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>每页</span>
+          <Select v-model="pageSizeModel">
+            <SelectTrigger class="h-8 w-[72px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+            </SelectContent>
+          </Select>
+          <span>条</span>
+          <span class="ml-2">第 {{ list.page.value }} / {{ list.totalPages.value }} 页</span>
+        </div>
         <Pagination
+          v-if="list.totalPages.value > 1"
           :page="list.page.value"
           :total="list.total.value"
           :items-per-page="list.pageSize.value"

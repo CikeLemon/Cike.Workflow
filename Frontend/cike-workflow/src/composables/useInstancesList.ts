@@ -84,13 +84,20 @@ export function useInstancesList(workspaceId: string) {
     return filter
   }
 
+  // Monotonic sequence guard: only the latest in-flight fetch may write state, so
+  // overlapping requests (rapid filter/page changes) can't be clobbered by a stale
+  // response, and a response arriving after unmount becomes a harmless no-op.
+  let fetchSeq = 0
+
   async function fetch(): Promise<void> {
+    const seq = ++fetchSeq
     loading.value = true
     loadError.value = null
     const { data, error } = await postApiV1WorkflowInstancesPagedList({
       query: { Page: page.value, PageSize: pageSize.value },
       body: buildFilter(),
     })
+    if (seq !== fetchSeq) return // a newer request superseded this one — discard stale response
     if (error) {
       loadError.value = extractApiErrorMessage(error, "无法获取实例列表，请检查后端服务后重试")
       items.value = []
@@ -100,11 +107,23 @@ export function useInstancesList(workspaceId: string) {
     }
     items.value = (data?.items ?? []) as WorkflowInstanceItemDto[]
     total.value = Number(data?.total ?? 0)
+    // If the result set shrank (e.g. rows cancelled elsewhere), the current page may
+    // now be out of range — clamp to the last page and refetch so we never show a
+    // blank table while total > 0. Converges (page strictly decreases, floor 1).
+    if (page.value > totalPages.value) {
+      page.value = totalPages.value
+      return fetch()
+    }
     loading.value = false
   }
 
   async function loadDefinitionOptions(): Promise<void> {
-    const { data } = await getApiV1WorkflowDefinitionsOptionList({ query: { workspaceId } })
+    const { data, error } = await getApiV1WorkflowDefinitionsOptionList({ query: { workspaceId } })
+    if (error) {
+      actionError.value = extractApiErrorMessage(error, "加载工作流定义选项失败")
+      definitionOptions.value = []
+      return
+    }
     definitionOptions.value = data ?? []
   }
 
