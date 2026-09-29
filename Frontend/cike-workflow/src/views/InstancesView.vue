@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
 import { RouterLink, useRoute } from "vue-router"
-import { RefreshCw, Inbox, TriangleAlert, ChevronLeft, ChevronRight, ChevronDown, Search, SearchX, X } from "@lucide/vue"
+import { RefreshCw, Inbox, TriangleAlert, ChevronLeft, ChevronRight, ChevronDown, Search, SearchX, X, Check } from "@lucide/vue"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -226,6 +226,11 @@ onMounted(() => {
               <CommandEmpty>无匹配定义</CommandEmpty>
               <CommandGroup>
                 <CommandItem value="全部工作流定义" @select="() => clearDefinitionFilter()">
+                  <Check
+                    :size="16"
+                    class="mr-2 shrink-0"
+                    :class="list.selectedDefinitionIds.value.length === 0 ? 'opacity-100' : 'opacity-0'"
+                  />
                   全部工作流定义
                 </CommandItem>
               </CommandGroup>
@@ -236,6 +241,11 @@ onMounted(() => {
                   :value="opt.definitionId ?? ''"
                   @select="() => selectDefinition(opt.definitionId!)"
                 >
+                  <Check
+                    :size="16"
+                    class="mr-2 shrink-0"
+                    :class="list.selectedDefinitionIds.value.includes(opt.definitionId ?? '') ? 'opacity-100' : 'opacity-0'"
+                  />
                   {{ opt.name }}
                 </CommandItem>
               </CommandGroup>
