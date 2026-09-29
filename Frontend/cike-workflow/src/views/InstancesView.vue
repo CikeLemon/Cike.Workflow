@@ -336,6 +336,7 @@ onMounted(() => {
                   <Badge v-if="isSubWorkflow(inst.parentWorkflowInstanceId)" variant="outline" class="text-xs">
                     子流程
                   </Badge>
+                  <Badge v-if="inst.isDebug" variant="outline" class="text-xs">调试</Badge>
                 </div>
                 <button
                   v-if="inst.definitionId"
@@ -347,10 +348,7 @@ onMounted(() => {
                 </button>
               </TableCell>
               <TableCell>
-                <div class="flex items-center gap-1.5">
-                  <Badge :class="statusClass(inst.status)">{{ statusLabel(inst.status) }}</Badge>
-                  <Badge v-if="inst.isDebug" variant="outline" class="text-xs">调试</Badge>
-                </div>
+                <Badge :class="statusClass(inst.status)">{{ statusLabel(inst.status) }}</Badge>
               </TableCell>
               <TableCell class="font-mono text-xs">v{{ inst.version ?? 0 }}</TableCell>
               <TableCell class="font-mono text-xs text-muted-foreground">{{ inst.correlationId || "—" }}</TableCell>
