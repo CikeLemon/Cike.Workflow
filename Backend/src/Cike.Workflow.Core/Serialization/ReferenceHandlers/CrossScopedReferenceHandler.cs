@@ -13,12 +13,12 @@ public class CrossScopedReferenceHandler : ReferenceHandler
 
     /// <inheritdoc />
     public override ReferenceResolver CreateResolver() => _rootedResolver!;
-    
+
     /// <summary>
     /// Resets the reference resolver.
     /// </summary>
     public void Reset() => _rootedResolver = new CustomPreserveReferenceResolver();
-    
+
     /// <summary>
     /// Gets the reference resolver.
     /// </summary>

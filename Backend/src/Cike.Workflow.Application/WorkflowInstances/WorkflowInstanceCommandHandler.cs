@@ -4,6 +4,7 @@ internal class WorkflowInstanceCommandHandler(
     IWorkflowDispatcher workflowDispatcher,
     IStimulusDispatcher stimulusDispatcher,
     IWorkflowDefinitionRepository workflowDefinitionRepository,
+    IWorkflowInstanceRepository workflowInstanceRepository,
     ILock lockService,
     ISnowflakeIdGenerator identityGenerator)
 {
@@ -38,6 +39,11 @@ internal class WorkflowInstanceCommandHandler(
     [LocalEventHandler]
     public async Task CancelAsync(CancelWorkflowCommand command, CancellationToken cancellationToken = default)
     {
+        // 取消派发经后台事件异步执行，引擎侧异常仅记日志不回传发布方；
+        // 实例不存在在这里预检，给出业务语义的 400（本命令自身为同步事件，预检结果可回传）
+        if (!await workflowInstanceRepository.AnyAsync(x => x.Id == command.Request.WorkflowInstanceId, cancellationToken))
+            throw new UserFriendlyException("工作流实例不存在，请检查后重试。");
+
         await workflowDispatcher.DispatchAsync(command.Request, cancellationToken: cancellationToken);
     }
 

@@ -63,10 +63,9 @@ internal class WorkflowDebugRunTest : WorkflowDefinitionTestBase
         var instanceId = await ReadLongAsync(response);
         Assert.That(instanceId, Is.GreaterThan(0));
 
-        // 后台事件异步创建实例，轮询到详情后断言调试标记
-        var detail = await WaitUntilAsync(() => TryGetInstanceAsync(instanceId));
-        Assert.That(GetBool(detail!.RootElement, "isDebug"), Is.True);
-        Assert.That(GetInstanceStatus(detail.RootElement), Is.EqualTo(nameof(WorkflowStatus.Finished)));
+        // 后台事件异步执行：轮询到终态后断言调试标记
+        var detail = await WaitForInstanceStatusAsync(instanceId, WorkflowStatus.Finished);
+        Assert.That(GetBool(detail.RootElement, "isDebug"), Is.True);
     }
 
     [Test]

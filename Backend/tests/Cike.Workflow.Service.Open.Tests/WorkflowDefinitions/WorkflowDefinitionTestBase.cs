@@ -2,6 +2,7 @@ using Cike.EntityFrameworkCore;
 using Cike.UniversalId.ULong;
 using Cike.Workflow.Core.Enums;
 using Cike.Workflow.Core.Runners.Models;
+using Cike.Workflow.Core.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -131,6 +132,8 @@ public abstract class WorkflowDefinitionTestBase : BaseIntegrationTest
     /// <summary>
     /// 直库播种工作流实例（门禁/守卫的证据，绕过引擎）。Created/Updated 一律取传入时间，
     /// 传过去时间即可构造"调试证据已过期"场景；审计仅在 CreatedAt == default 时填充，显式值不会被覆盖。
+    /// WorkflowState 为影子列存储（实体映射 Ignore），直插不会触发仓储 OnSaveAsync 序列化钩子，
+    /// 这里显式写入 SerializedWorkflowState，保证引擎路径（如取消）能读到真实状态。
     /// </summary>
     protected async Task<long> SeedInstanceAsync(string definitionId, long definitionVersionRowId, bool isDebug,
         WorkflowStatus status, DateTime? createdAt = null)
@@ -138,6 +141,7 @@ public abstract class WorkflowDefinitionTestBase : BaseIntegrationTest
         using var scope = _rootServices.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CikeWorkflowDbContext>();
         var snowflake = scope.ServiceProvider.GetRequiredService<ISnowflakeIdGenerator>();
+        var stateSerializer = scope.ServiceProvider.GetRequiredService<IWorkflowStateSerializer>();
         var time = createdAt ?? DateTime.Now;
 
         var instance = new WorkflowInstance
@@ -162,6 +166,7 @@ public abstract class WorkflowDefinitionTestBase : BaseIntegrationTest
         instance.WorkflowState.Id = instance.Id;
 
         dbContext.WorkflowInstances.Add(instance);
+        dbContext.Entry(instance).Property("SerializedWorkflowState").CurrentValue = stateSerializer.Serialize(instance.WorkflowState);
         await dbContext.SaveChangesAsync();
         await dbContext.Database.CurrentTransaction!.CommitAsync();
         return instance.Id;
@@ -180,6 +185,31 @@ public abstract class WorkflowDefinitionTestBase : BaseIntegrationTest
         }
 
         throw new TimeoutException("条件在超时时间内未满足。");
+    }
+
+    /// <summary>轮询实例详情直到状态等于期望值（引擎经后台事件异步执行，返回时状态尚未落库）。</summary>
+    protected async Task<JsonDocument> WaitForInstanceStatusAsync(long instanceId, WorkflowStatus expected)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        var lastStatus = "<不存在>";
+        while (DateTime.UtcNow < deadline)
+        {
+            var response = await CreateClient().GetAsync($"/api/v1/WorkflowInstances/{instanceId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
+                if (doc != null)
+                {
+                    lastStatus = GetInstanceStatus(doc.RootElement);
+                    if (lastStatus == expected.ToString())
+                        return doc;
+                }
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException($"实例 {instanceId} 未在超时时间内转为 {expected}，最后状态：{lastStatus}。");
     }
 
     /// <summary>播种一条新鲜的调试成功记录（发布门禁证据）：Finished + 创建时间在未来一分钟，保证晚于行内容变更。</summary>

@@ -6,6 +6,7 @@ using Cike.Workflow.Application.WorkflowInstances.Commands;
 using Cike.Workflow.Application.WorkflowInstances.Queries;
 using Cike.Workflow.Core.Contexts.Models;
 using Cike.Workflow.Domain.Filters;
+using Cike.Workflow.Runtime.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
@@ -54,6 +55,21 @@ public class WorkflowInstanceService : MinimalApiServiceBase
         var command = new RunDebugWorkflowCommand(id, dto?.Input);
         await localEventBus.PublishAsync(command, cancellationToken);
         return TypedResults.Ok(command.WorkflowInstanceId);
+    }
+
+    /// <summary>
+    /// 取消运行中的工作流实例：派发取消事件，引擎清空书签并将状态落库为 Cancelled，
+    /// 实时通道补推取消终态。取消经后台事件异步执行，返回时状态尚未变更，前端按实例详情轮询；
+    /// 非运行中实例静默忽略（幂等），实例不存在返回 400。
+    /// </summary>
+    public async Task<Results<Ok, BadRequest>> PostCancelAsync(
+        [FromServices] ILocalEventBus localEventBus,
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        var command = new CancelWorkflowCommand(new DispatchCancelWorkflowRequest { WorkflowInstanceId = id });
+        await localEventBus.PublishAsync(command, cancellationToken);
+        return TypedResults.Ok();
     }
 
     public async Task<Results<Ok<List<WorkflowExecutionLogEntry>>, BadRequest>> GetLogsAsync(

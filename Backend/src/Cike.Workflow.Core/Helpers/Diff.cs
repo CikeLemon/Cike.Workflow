@@ -16,12 +16,12 @@ public class Diff<T>
     /// The added items.
     /// </summary>
     public ICollection<T> Added { get; }
-    
+
     /// <summary>
     /// The removed items.
     /// </summary>
     public ICollection<T> Removed { get; }
-    
+
     /// <summary>
     /// The unchanged items.
     /// </summary>
@@ -37,12 +37,12 @@ public static class Diff
     /// Creates a new diff.
     /// </summary>
     public static Diff<T> From<T>(ICollection<T> added, ICollection<T> removed, ICollection<T> unchanged) => new(added, removed, unchanged);
-    
+
     /// <summary>
     /// Returns an empty diff.
     /// </summary>
     public static Diff<T> Empty<T>() => new(Array.Empty<T>(), Array.Empty<T>(), Array.Empty<T>());
-    
+
     /// <summary>
     /// Create a diff between two sets.
     /// </summary>

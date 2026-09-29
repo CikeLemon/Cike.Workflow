@@ -38,6 +38,7 @@ public class WorkflowInstanceFactory(ISnowflakeIdGenerator identityGenerator) : 
         {
             Id = workflowState.Id,
             ParentWorkflowInstanceId = workflowState.ParentWorkflowInstanceId ?? 0,
+            WorkspaceId = workflow.DefinitionInfo.WorkspaceId,
             WorkflowState = workflowState,
             DefinitionId = workflowState.DefinitionId,
             DefinitionVersionId = workflowState.DefinitionVersionId,

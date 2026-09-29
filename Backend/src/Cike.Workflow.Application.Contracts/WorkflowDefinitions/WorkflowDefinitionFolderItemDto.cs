@@ -7,7 +7,7 @@ public class WorkflowDefinitionFolderItemDto : AuditedEntityDto<long>
     public WorkflowDefinitionFolderBaseDto Data { get; set; } = null!;
 }
 
-[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(FolderItemDto), (int)WorkflowDefinitionFolderBaseType.Folder)]
 [JsonDerivedType(typeof(WorkflowDefinitionItemDto), (int)WorkflowDefinitionFolderBaseType.WorkflowDefinition)]
 public class WorkflowDefinitionFolderBaseDto

@@ -23,7 +23,7 @@ internal class DebugHttpRequestHeaderTest : WorkflowDefinitionTestBase
     {
         public const string HeaderName = "isDebug";
 
-        private readonly TaskCompletionSource _captured = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource _captured = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private WebApplication _app = default!;
         private Task _serverTask = Task.CompletedTask;
 
@@ -49,6 +49,14 @@ internal class DebugHttpRequestHeaderTest : WorkflowDefinitionTestBase
 
             _serverTask = _app.RunAsync();
             await WaitForReadyAsync(Url);
+            Reset();
+        }
+
+        /// <summary>清空就绪探针留下的捕获（探针请求会置位信号且无 isDebug 头），保证断言针对被测请求。</summary>
+        public void Reset()
+        {
+            DebugHeader = null;
+            _captured = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
         public async ValueTask DisposeAsync()
@@ -153,13 +161,9 @@ internal class DebugHttpRequestHeaderTest : WorkflowDefinitionTestBase
         await receiver.Captured.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.That(receiver.DebugHeader, Is.EqualTo("true"));
 
-        // 调试实例正常走完
-        var detail = await WaitUntilAsync(async () =>
-        {
-            var response = await CreateClient().GetAsync($"/api/v1/WorkflowInstances/{instanceId}");
-            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<JsonDocument>() : null;
-        });
-        Assert.That(GetInstanceStatus(detail!.RootElement), Is.EqualTo(nameof(WorkflowStatus.Finished)));
+        // 调试实例正常走完（后台事件异步执行，轮询到终态）
+        var detail = await WaitForInstanceStatusAsync(instanceId, WorkflowStatus.Finished);
+        Assert.That(GetBool(detail.RootElement, "isDebug"), Is.True);
     }
 
     [Test]

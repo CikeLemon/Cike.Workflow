@@ -101,10 +101,10 @@ dotnet test Backend/tests/Cike.Workflow.Core.Tests
 
 ## 7. 数据库策略（已定：SQLite in-memory）
 
-EF Core 相关测试使用 **SQLite in-memory 共享单连接**，基座见 `Cike.Workflow.EntityFrameworkCore.Tests/Infrastructure`（`RepositoryTestBase` 直接继承使用）：
+EF Core 相关测试使用 **SQLite in-memory**，基座见 `Cike.Workflow.EntityFrameworkCore.Tests/Infrastructure`（`RepositoryTestBase` 直接继承使用）：
 
 - **组装方式与生产一致**：模块加载（`AddApplicationAsync` + `AddCikeDbContext`）不走捷径，覆盖同实体默认仓储的约定注册照常生效
-- **方言覆盖**：模块加载完成后经 `Configure<CikeDbContextOptions>` 注入共享 SQLite 连接覆盖 MySQL；连接存活期间库不丢失，跨 Scope 可见已提交数据；影子属性的 `json` 列类型在 SQLite 下按 TEXT 类型亲和性建表，生产 MySQL 映射不受影响
+- **方言覆盖**：模块加载完成后经 `Configure<CikeDbContextOptions>` 注入 SQLite 连接串（`mode=memory&cache=shared` 命名内存库）覆盖 MySQL；主连接全程保活使库不丢失，各 DbContext 经连接串自开连接、跨 Scope 可见已提交数据——引擎事件走后台 Channel 并发执行后，请求管道与后台 Scope 并发访问数据库，共享单连接对象会命令冲突，禁止回退。影子属性的 `json` 列类型在 SQLite 下按 TEXT 类型亲和性建表，生产 MySQL 映射不受影响
 - **不启用环境事务**（`UnitOfWorkOptions.Enable = false`）：生产由请求管道的事务中间件统一提交，测试没有该中间件，不关闭的话仓储写入停留在未提交事务里、Scope 销毁即回滚
 - **外部依赖替身**：`ICacheService<>` 以内存实现接管（不依赖 Redis），`ICurrentUser` 以 FakeCurrentUser 接管
 - **隔离模型**：每个测试类独享一个宿主（独立 in-memory 库），类内测试共享、用唯一数据标记隔离

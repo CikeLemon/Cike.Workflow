@@ -17,13 +17,15 @@ namespace Cike.Workflow.Service.Open.Tests;
 
 /// <summary>
 /// HTTP 集成测试基类：WebApplicationFactory 起真实 host，经 HttpClient 走完整请求管道。
-/// 数据库为共享单连接的 SQLite in-memory（覆盖 MySQL 方言，连接存活期间库不丢失）；
+/// 数据库为共享缓存命名内存库的 SQLite（覆盖 MySQL 方言）：主连接全程保活使库不丢失，
+/// 各 DbContext 经连接串自开连接——引擎事件走后台 Channel 并发执行后，请求管道与后台
+/// Scope 会并发访问数据库，共享单连接对象会命令冲突。每个测试类独享一个宿主（独立内存库）；
 /// ICacheService 以内存替身接管（不依赖 Redis）；测试数据需显式传 Code / DefinitionId，
-/// 避免触发分布式缓存的序列号生成路径。每个测试类独享一个宿主（独立 in-memory 库）。
+/// 避免触发分布式缓存的序列号生成路径。
 /// </summary>
 public abstract class BaseIntegrationTest : IDisposable
 {
-    private readonly SqliteConnection _connection = new("DataSource=:memory:");
+    private readonly SqliteConnection _connection = new($"Data Source=file:cike_test_{Guid.NewGuid():N}?mode=memory&cache=shared");
     private WebApplicationFactory<Program> _app = default!;
     private IServiceScope _scope = default!;
 
@@ -32,7 +34,9 @@ public abstract class BaseIntegrationTest : IDisposable
 
     protected BaseIntegrationTest()
     {
+        // 主连接保活：共享缓存内存库在最后一个连接关闭即消失
         _connection.Open();
+        var connectionString = _connection.ConnectionString;
 
         _app = new WebApplicationFactory<Program>()
           .WithWebHostBuilder(builder =>
@@ -48,8 +52,9 @@ public abstract class BaseIntegrationTest : IDisposable
               // 在应用自身的服务注册完成之后覆盖：SQLite 连接 + 缓存替身
               builder.ConfigureTestServices(services =>
               {
+                  // 经连接串让每个 DbContext 自开连接（并发安全），库由主连接保活
                   services.Configure<CikeDbContextOptions>(options =>
-                      options.Configure(context => context.DbContextOptionsBuilder.UseSqlite(_connection)));
+                      options.Configure(context => context.DbContextOptionsBuilder.UseSqlite(connectionString)));
                   services.Replace(ServiceDescriptor.Singleton(typeof(ICacheService<>), typeof(InMemoryCacheService<>)));
                   // 定义运行时缓存的真实实现跑在此内存介质上（不依赖 Redis），键/索引/选取逻辑被真实执行
                   services.Replace(ServiceDescriptor.Singleton<IMultilevelCacheClient, InMemoryMultilevelCacheClient>());

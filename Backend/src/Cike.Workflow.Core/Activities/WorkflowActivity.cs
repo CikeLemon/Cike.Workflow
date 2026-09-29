@@ -126,6 +126,8 @@ public class WorkflowDefinitionInfo
 
     public long TenantId { get; set; }
 
+    public long WorkspaceId { get; set; }
+
     public bool IsLatest { get; set; }
 
     public bool IsPublished { get; set; }

@@ -1,0 +1,126 @@
+diff --git a/Frontend/cike-workflow/openapi/swagger.json b/Frontend/cike-workflow/openapi/swagger.json
+index 49300c9..b34313b 100644
+--- a/Frontend/cike-workflow/openapi/swagger.json
++++ b/Frontend/cike-workflow/openapi/swagger.json
+@@ -342,6 +342,42 @@
+         }
+       }
+     },
++    "/api/v1/WorkflowDefinitions/OptionList": {
++      "get": {
++        "tags": [
++          "WorkflowDefinitionService"
++        ],
++        "parameters": [
++          {
++            "name": "workspaceId",
++            "in": "query",
++            "required": true,
++            "schema": {
++              "type": "integer",
++              "format": "int64"
++            }
++          }
++        ],
++        "responses": {
++          "200": {
++            "description": "OK",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "type": "array",
++                  "items": {
++                    "$ref": "#/components/schemas/WorkflowDefinitionOptionDto"
++                  }
++                }
++              }
++            }
++          },
++          "400": {
++            "description": "Bad Request"
++          }
++        }
++      }
++    },
+     "/api/v1/WorkflowDefinitions/{id}": {
+       "get": {
+         "tags": [
+@@ -819,6 +855,32 @@
+         }
+       }
+     },
++    "/api/v1/WorkflowInstances/Cancel/{id}": {
++      "post": {
++        "tags": [
++          "WorkflowInstanceService"
++        ],
++        "parameters": [
++          {
++            "name": "id",
++            "in": "path",
++            "required": true,
++            "schema": {
++              "type": "integer",
++              "format": "int64"
++            }
++          }
++        ],
++        "responses": {
++          "200": {
++            "description": "OK"
++          },
++          "400": {
++            "description": "Bad Request"
++          }
++        }
++      }
++    },
+     "/api/v1/WorkflowInstances/Logs/{id}": {
+       "get": {
+         "tags": [
+@@ -2209,6 +2271,18 @@
+           }
+         ]
+       },
++      "WorkflowDefinitionOptionDto": {
++        "type": "object",
++        "properties": {
++          "definitionId": {
++            "type": "string"
++          },
++          "name": {
++            "type": "string"
++          }
++        },
++        "additionalProperties": false
++      },
+       "WorkflowDefinitionOptionsValueObject": {
+         "type": "object",
+         "properties": {
+@@ -2410,6 +2484,11 @@
+             "format": "int64",
+             "nullable": true
+           },
++          "workspaceId": {
++            "type": "integer",
++            "format": "int64",
++            "nullable": true
++          },
+           "definitionIds": {
+             "type": "array",
+             "items": {
+@@ -2425,6 +2504,14 @@
+             },
+             "nullable": true
+           },
++          "workspaceIds": {
++            "type": "array",
++            "items": {
++              "type": "integer",
++              "format": "int64"
++            },
++            "nullable": true
++          },
+           "version": {
+             "type": "integer",
+             "format": "int32",

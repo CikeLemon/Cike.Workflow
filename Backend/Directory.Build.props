@@ -1,12 +1,11 @@
 <Project>
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <StandardTargetFramework>netstandard2.1</StandardTargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Version>1.0.0</Version>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AbpProjectType>app</AbpProjectType>
-    <CikeVersion>1.0.60028</CikeVersion>
-    <MicrosoftPackageVersion>8.0.0</MicrosoftPackageVersion>
+    <CikeVersion>1.0.9</CikeVersion>
+    <MicrosoftPackageVersion>10.0.12</MicrosoftPackageVersion>
   </PropertyGroup>
 </Project>

@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="EFCore.Sharding.MySql" Version="8.0.9" />
     <PackageReference Include="ShardingCore" Version="7.8.1.22" />
     <PackageReference Include="Cike.Data.EFCore.MySql" Version="$(CikeVersion)" />
     <PackageReference Include="SkiaSharp.QrCode" Version="0.7.0" />

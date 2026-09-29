@@ -38,6 +38,7 @@ public class WorkflowDefinitionMapper : ISingletonDependency
                 IsPublished = source.IsPublished,
                 Name = source.Name,
                 TenantId = source.TenantId,
+                WorkspaceId = source.WorkspaceId,
                 UsableAsActivity = source.UsableAsActivity,
                 Version = source.Version
             });
