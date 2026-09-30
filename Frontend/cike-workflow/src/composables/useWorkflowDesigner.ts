@@ -82,6 +82,8 @@ export function useWorkflowDesigner() {
   const isPublished = ref(false)
   /** Every version row of this definition (newest first as returned by API). */
   const versions = shallowRef<WorkflowDefinitionVersionItemDto[]>([])
+  /** Transport error of the last version-list fetch; surfaced in the history sheet. */
+  const versionsError = ref<string | null>(null)
   /** Historic (non-latest) versions are frozen: canvas is view-only. */
   const readonly = computed(() => !isLatest.value)
   /** Debug requires a draft latest version (published rows are rejected by backend). */
@@ -720,15 +722,24 @@ export function useWorkflowDesigner() {
       path: { id: rowId.value },
       body: { input: input ?? {} },
     })
-    if (error || data == null) return null
+    if (error || data == null) {
+      saveError.value = extractApiErrorMessage(error, "调试启动失败，请稍后重试")
+      return null
+    }
     return String(data)
   }
 
   async function loadVersions(): Promise<void> {
     if (!definitionId.value) return
-    const { data } = await getApiV1WorkflowDefinitionsVersionList({
+    versionsError.value = null
+    const { data, error } = await getApiV1WorkflowDefinitionsVersionList({
       query: { definitionId: definitionId.value },
     })
+    if (error) {
+      versionsError.value = extractApiErrorMessage(error, "加载版本列表失败，请稍后重试")
+      versions.value = []
+      return
+    }
     versions.value = (data ?? []) as WorkflowDefinitionVersionItemDto[]
   }
 
@@ -794,7 +805,7 @@ export function useWorkflowDesigner() {
       body: { definitionId: definitionId.value, definitionVersionId },
     })
     if (error) {
-      saveError.value = typeof error === "string" ? error : JSON.stringify(error)
+      saveError.value = extractApiErrorMessage(error, "回滚失败，请稍后重试")
       return
     }
     await returnToLatest()
@@ -815,6 +826,7 @@ export function useWorkflowDesigner() {
     isPublished,
     readonly,
     versions,
+    versionsError,
     loadError,
     loading,
     drillStack,

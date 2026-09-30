@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import WorkspaceFormDialog from "@/components/WorkspaceFormDialog.vue"
+import { extractApiErrorMessage } from "@/lib/apiError"
 
 // --- 图标配色：根据 workspace name 哈希选取 chart 色系（均为 style.css 定义的主题变量） ---
 const CHART_COLORS = [
@@ -147,20 +148,26 @@ function onSaved() {
 const deleteDialogOpen = ref(false)
 const deletingWorkspace = ref<WorkspaceItemDto | null>(null)
 const deleting = ref(false)
+const deleteError = ref("")
 
 function openDelete(ws: WorkspaceItemDto) {
   deletingWorkspace.value = ws
+  deleteError.value = ""
   deleteDialogOpen.value = true
 }
 
 async function confirmDelete() {
   if (!deletingWorkspace.value) return
   deleting.value = true
+  deleteError.value = ""
   try {
     const { error } = await deleteApiV1Workspaces({
       query: { workspaceId: deletingWorkspace.value.id! },
     })
-    if (error) return
+    if (error) {
+      deleteError.value = extractApiErrorMessage(error, "删除失败，请稍后重试")
+      return
+    }
     deleteDialogOpen.value = false
     deletingWorkspace.value = null
     reload()
@@ -312,6 +319,9 @@ onMounted(() => {
             确定要删除空间「{{ deletingWorkspace?.name }}」吗？此操作不可撤销。
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <p v-if="deleteError" class="text-sm text-destructive">
+          {{ deleteError }}
+        </p>
         <AlertDialogFooter>
           <Button variant="outline" @click="deleteDialogOpen = false">
             取消

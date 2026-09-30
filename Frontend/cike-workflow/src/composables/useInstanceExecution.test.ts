@@ -173,4 +173,13 @@ describe("useInstanceExecution", () => {
     expect(exec.loadError.value).toBeTruthy()
     expect(exec.loading.value).toBe(false)
   })
+
+  it("surfaces the backend message instead of stringifying the error object", async () => {
+    mockGetInstance.mockResolvedValue({ data: null, error: { detail: "实例不存在" } })
+
+    const exec = useInstanceExecution("inst-1")
+    await exec.load()
+
+    expect(exec.loadError.value).toBe("实例不存在")
+  })
 })

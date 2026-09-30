@@ -111,7 +111,10 @@ async function confirmRollback() {
             </div>
           </li>
         </ul>
-        <p v-if="designer.versions.value.length === 0" class="py-6 text-center text-sm text-muted-foreground">
+        <p v-if="designer.versionsError.value" class="py-6 text-center text-sm text-destructive">
+          {{ designer.versionsError.value }}
+        </p>
+        <p v-else-if="designer.versions.value.length === 0" class="py-6 text-center text-sm text-muted-foreground">
           暂无版本记录
         </p>
       </div>

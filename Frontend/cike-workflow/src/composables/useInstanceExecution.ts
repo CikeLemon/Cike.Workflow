@@ -13,6 +13,7 @@ import {
   type ProgressEvent,
 } from "@/core/designer/execution"
 import type { ActivityStatus } from "@/api/generated"
+import { extractApiErrorMessage } from "@/lib/apiError"
 
 /**
  * Composable managing the real-time execution state for a workflow instance
@@ -66,7 +67,7 @@ export function useInstanceExecution(instanceId: string) {
     try {
       const { data, error } = await getApiV1WorkflowInstancesById({ path: { id: instanceId } })
       if (error || !data) {
-        loadError.value = error ? String(error) : "加载实例失败"
+        loadError.value = extractApiErrorMessage(error, "加载实例失败")
         return
       }
 
@@ -79,7 +80,7 @@ export function useInstanceExecution(instanceId: string) {
       if (data.definitionVersionId) {
         const def = await getApiV1WorkflowDefinitionsById({ path: { id: data.definitionVersionId } })
         if (def.error || !def.data) {
-          loadError.value = "加载定义版本失败"
+          loadError.value = extractApiErrorMessage(def.error, "加载定义版本失败")
           return
         }
         definitionRoot.value = (def.data as Record<string, unknown>).root ?? null

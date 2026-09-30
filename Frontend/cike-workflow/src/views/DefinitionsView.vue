@@ -37,6 +37,7 @@ import {
 import FolderFormDialog from "@/components/FolderFormDialog.vue"
 import DefinitionFormDialog from "@/components/DefinitionFormDialog.vue"
 import MoveDefinitionDialog from "@/components/MoveDefinitionDialog.vue"
+import { extractApiErrorMessage } from "@/lib/apiError"
 
 const ROOT_FOLDER_ID = "0"
 
@@ -186,21 +187,27 @@ function openMoveDefinition(item: WorkflowDefinitionFolderItemDto) {
 const deleteDialogOpen = ref(false)
 const deletingItem = ref<WorkflowDefinitionFolderItemDto | null>(null)
 const deleting = ref(false)
+const deleteError = ref("")
 
 function openDelete(item: WorkflowDefinitionFolderItemDto) {
   deletingItem.value = item
+  deleteError.value = ""
   deleteDialogOpen.value = true
 }
 
 async function confirmDelete() {
   if (!deletingItem.value) return
   deleting.value = true
+  deleteError.value = ""
   try {
     const isFolder = deletingItem.value.type === 1
     const { error } = isFolder
       ? await deleteApiV1Folders({ query: { folderId: deletingItem.value.id! } })
       : await deleteApiV1WorkflowDefinitionsById({ path: { id: deletingItem.value.id! } })
-    if (error) return
+    if (error) {
+      deleteError.value = extractApiErrorMessage(error, "删除失败，请稍后重试")
+      return
+    }
     deleteDialogOpen.value = false
     deletingItem.value = null
     refresh()
@@ -459,6 +466,9 @@ async function copyDefinitionId(definitionId: string) {
             </template>
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <p v-if="deleteError" class="text-sm text-destructive">
+          {{ deleteError }}
+        </p>
         <AlertDialogFooter>
           <Button variant="outline" @click="deleteDialogOpen = false">
             取消

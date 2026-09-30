@@ -219,6 +219,23 @@ describe("useWorkflowDesigner versions", () => {
     expect(body.definitionVersionId).toBe("90")
   })
 
+  it("Rollback_ApiError_SurfacesBackendMessageInSaveError", async () => {
+    rollback.mockResolvedValue({ data: undefined, error: "该版本已发布，不可回滚" })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+    await designer.rollback("90")
+    expect(designer.saveError.value).toBe("该版本已发布，不可回滚")
+  })
+
+  it("LoadVersions_ApiError_SetsVersionsError", async () => {
+    versionList.mockResolvedValue({ data: null, error: "版本列表不可用" })
+    const designer = useWorkflowDesigner()
+    // load() fires loadVersions without awaiting it — wait for the rejection surface.
+    await designer.load("100")
+    await vi.waitFor(() => expect(designer.versionsError.value).toBe("版本列表不可用"))
+    expect(designer.versions.value).toEqual([])
+  })
+
   it("ReturnToLatest_LoadsLatestVersionRow", async () => {
     versionList.mockResolvedValue({
       data: [
@@ -685,7 +702,7 @@ describe("debugRun", () => {
   })
 
   it("DebugRun_ReturnsNullOnApiError", async () => {
-    debugRun.mockResolvedValue({ data: null, error: { message: "bad request" } })
+    debugRun.mockResolvedValue({ data: null, error: { detail: "定义已发布，不能调试" } })
     getById.mockResolvedValue({ data: makeDetail(), error: undefined })
     const designer = useWorkflowDesigner()
     await designer.load("100")
@@ -693,6 +710,7 @@ describe("debugRun", () => {
     const instanceId = await designer.debugRun({})
 
     expect(instanceId).toBeNull()
+    expect(designer.saveError.value).toBe("定义已发布，不能调试")
   })
 
   it("DebugRun_PassesEmptyInputWhenNoneProvided", async () => {
