@@ -167,6 +167,11 @@ const pageSizeModel = computed({
 
 // --- row cancel (irreversible → confirm gate; async → refetch, no optimistic flip) ---
 const cancelTarget = ref<WorkflowInstanceItemDto | null>(null)
+// reka's AlertDialogAction dismisses the dialog on click, and that close runs through
+// the cancelOpen setter (nulling cancelTarget) potentially BEFORE our confirm handler
+// runs. So capture the id separately at open time; confirmCancel reads this, never
+// cancelTarget, otherwise the confirm click sees a null id and sends no request.
+const pendingCancelId = ref<string | null>(null)
 const cancelOpen = computed({
   get: () => cancelTarget.value !== null,
   set: (v: boolean) => {
@@ -175,9 +180,11 @@ const cancelOpen = computed({
 })
 function askCancel(inst: WorkflowInstanceItemDto): void {
   cancelTarget.value = inst
+  pendingCancelId.value = inst.id ?? null
 }
 async function confirmCancel(): Promise<void> {
-  const id = cancelTarget.value?.id
+  const id = pendingCancelId.value
+  pendingCancelId.value = null
   cancelTarget.value = null
   if (id) await list.cancel(id)
 }
