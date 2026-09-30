@@ -282,7 +282,7 @@ const definitionTypeLabel = computed(() => {
             </div>
             <UiInput
               :model-value="variable.name ?? ''"
-              class="h-6 flex-1 text-xs font-mono"
+              class="h-8 flex-1 text-xs font-mono"
               placeholder="name"
               :disabled="isReadonly"
               @change="(e: Event) => commitVariableRename(index, (e.target as HTMLInputElement).value)"
@@ -297,7 +297,7 @@ const definitionTypeLabel = computed(() => {
               :disabled="isReadonly"
               @update:model-value="(v) => updateVariable(index, { typeName: String(v) })"
             >
-              <SelectTrigger size="sm" class="h-6 w-28 text-[11px]">
+              <SelectTrigger size="sm" class="w-28 text-[11px]">
                 <SelectValue class="block! min-w-0 truncate" />
               </SelectTrigger>
               <SelectContent>
@@ -329,7 +329,7 @@ const definitionTypeLabel = computed(() => {
               <Label class="text-[10px]">默认值</Label>
               <UiInput
                 :model-value="variable.defaultValue ?? ''"
-                class="h-6 text-xs"
+                class="h-8 text-xs"
                 placeholder="（空）"
                 :disabled="isReadonly"
                 @change="(e: Event) => updateVariable(index, { defaultValue: (e.target as HTMLInputElement).value || null })"
@@ -342,7 +342,7 @@ const definitionTypeLabel = computed(() => {
                 :disabled="isReadonly"
                 @update:model-value="(v) => updateVariable(index, { storageDriverType: String(v) })"
               >
-                <SelectTrigger size="sm" class="h-6 w-full text-[11px]">
+                <SelectTrigger size="sm" class="w-full text-[11px]">
                   <SelectValue class="block! min-w-0 truncate" />
                 </SelectTrigger>
                 <SelectContent>
@@ -382,7 +382,7 @@ const definitionTypeLabel = computed(() => {
             </div>
             <UiInput
               :model-value="input.name ?? ''"
-              class="h-6 flex-1 text-xs font-mono"
+              class="h-8 flex-1 text-xs font-mono"
               placeholder="name"
               :disabled="isReadonly"
               @change="(e: Event) => commitInputRename(index, (e.target as HTMLInputElement).value)"
@@ -392,7 +392,7 @@ const definitionTypeLabel = computed(() => {
               :disabled="isReadonly"
               @update:model-value="(v) => updateInput(index, { type: String(v) })"
             >
-              <SelectTrigger size="sm" class="h-6 w-24 shrink-0 text-[11px]">
+              <SelectTrigger size="sm" class="w-24 shrink-0 text-[11px]">
                 <SelectValue class="block! min-w-0 truncate" />
               </SelectTrigger>
               <SelectContent>
@@ -409,7 +409,7 @@ const definitionTypeLabel = computed(() => {
           <div class="flex items-center gap-2 pl-5">
             <UiInput
               :model-value="input.displayName ?? ''"
-              class="h-6 flex-1 text-[11px]"
+              class="h-8 flex-1 text-[11px]"
               placeholder="显示名"
               :disabled="isReadonly"
               @change="(e: Event) => updateInput(index, { displayName: (e.target as HTMLInputElement).value || undefined })"
@@ -438,7 +438,7 @@ const definitionTypeLabel = computed(() => {
               <Label class="text-[10px]">说明</Label>
               <UiInput
                 :model-value="input.description ?? ''"
-                class="h-6 text-xs"
+                class="h-8 text-xs"
                 :disabled="isReadonly"
                 @change="(e: Event) => updateInput(index, { description: (e.target as HTMLInputElement).value || undefined })"
               />
@@ -450,10 +450,11 @@ const definitionTypeLabel = computed(() => {
                 label="默认值"
                 :allowed-types="INPUT_DEFAULT_ALLOWED_TYPES"
                 literal-default=""
+                dense
               >
                 <template #default="{ value, commit }">
                   <UiInput
-                    class="h-6 text-xs"
+                    class="h-8 text-xs"
                     :model-value="value == null ? '' : String(value)"
                     :disabled="isReadonly"
                     @change="(e: Event) => { const raw = (e.target as HTMLInputElement).value; commit(raw === '' ? null : raw) }"
@@ -468,7 +469,7 @@ const definitionTypeLabel = computed(() => {
                 :disabled="isReadonly"
                 @update:model-value="(v) => updateInput(index, { storageDriverType: String(v) })"
               >
-                <SelectTrigger size="sm" class="h-6 w-full text-[11px]">
+                <SelectTrigger size="sm" class="w-full text-[11px]">
                   <SelectValue class="block! min-w-0 truncate" />
                 </SelectTrigger>
                 <SelectContent>
@@ -508,7 +509,7 @@ const definitionTypeLabel = computed(() => {
             </div>
             <UiInput
               :model-value="output.name ?? ''"
-              class="h-6 flex-1 text-xs font-mono"
+              class="h-8 flex-1 text-xs font-mono"
               placeholder="name"
               :disabled="isReadonly"
               @change="(e: Event) => updateOutput(index, { name: (e.target as HTMLInputElement).value })"
@@ -518,7 +519,7 @@ const definitionTypeLabel = computed(() => {
               :disabled="isReadonly"
               @update:model-value="(v) => updateOutput(index, { type: String(v) })"
             >
-              <SelectTrigger size="sm" class="h-6 w-24 shrink-0 text-[11px]">
+              <SelectTrigger size="sm" class="w-24 shrink-0 text-[11px]">
                 <SelectValue class="block! min-w-0 truncate" />
               </SelectTrigger>
               <SelectContent>
@@ -535,7 +536,7 @@ const definitionTypeLabel = computed(() => {
           <div class="flex items-center gap-2 pl-5">
             <UiInput
               :model-value="output.displayName ?? ''"
-              class="h-6 flex-1 text-[11px]"
+              class="h-8 flex-1 text-[11px]"
               placeholder="显示名"
               :disabled="isReadonly"
               @change="(e: Event) => updateOutput(index, { displayName: (e.target as HTMLInputElement).value || undefined })"
@@ -564,7 +565,7 @@ const definitionTypeLabel = computed(() => {
               <Label class="text-[10px]">说明</Label>
               <UiInput
                 :model-value="output.description ?? ''"
-                class="h-6 text-xs"
+                class="h-8 text-xs"
                 :disabled="isReadonly"
                 @change="(e: Event) => updateOutput(index, { description: (e.target as HTMLInputElement).value || undefined })"
               />
@@ -575,10 +576,11 @@ const definitionTypeLabel = computed(() => {
                 :designer="designer"
                 label="默认值"
                 literal-default=""
+                dense
               >
                 <template #default="{ value, commit }">
                   <UiInput
-                    class="h-6 text-xs"
+                    class="h-8 text-xs"
                     :model-value="value == null ? '' : String(value)"
                     :disabled="isReadonly"
                     @change="(e: Event) => { const raw = (e.target as HTMLInputElement).value; commit(raw === '' ? null : raw) }"
@@ -614,7 +616,7 @@ const definitionTypeLabel = computed(() => {
           </div>
           <UiInput
             :model-value="outcome"
-            class="h-6 flex-1 text-xs"
+            class="h-8 flex-1 text-xs"
             placeholder="结果名称"
             :disabled="isReadonly"
             @change="(e: Event) => updateOutcome(index, (e.target as HTMLInputElement).value)"

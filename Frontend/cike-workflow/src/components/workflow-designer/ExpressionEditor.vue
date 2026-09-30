@@ -31,6 +31,9 @@ const props = defineProps<{
   /** Suppress the built-in icon type switcher, for callers that own the
    *  top-level type choice themselves (e.g. ConditionEditor's escape hatch). */
   hideTypeSwitcher?: boolean
+  /** Compact label/spacing variant for dense panels (WorkflowConfigPanel);
+   *  the value editor and type switcher keep the standard h-8 row height. */
+  dense?: boolean
 }>()
 
 const isReadonly = computed(() => props.readonly ?? props.designer.readonly.value)
@@ -153,8 +156,8 @@ function onTypeChange(type: string): void {
 </script>
 
 <template>
-  <div class="space-y-1">
-    <Label v-if="label" class="text-xs" :title="description ?? undefined">{{ label }}</Label>
+  <div :class="dense ? 'space-y-0.5' : 'space-y-1'">
+    <Label v-if="label" :class="dense ? 'text-[10px]' : 'text-xs'" :title="description ?? undefined">{{ label }}</Label>
 
     <div class="flex items-start gap-2">
       <div class="min-w-0 flex-1">

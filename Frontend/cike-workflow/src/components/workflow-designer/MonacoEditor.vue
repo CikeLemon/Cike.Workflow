@@ -69,6 +69,10 @@ async function setup(): Promise<void> {
     overviewRulerLanes: 0,
     hideCursorInOverviewRuler: true,
     scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
+    // Suggest/hover widgets are laid out as fixed-position overlays in viewport
+    // coordinates, so they escape the small overflow-hidden container instead
+    // of being clipped by it (the panel chain must stay transform-free).
+    fixedOverflowWidgets: true,
   })
   editor.onDidChangeModelContent(() => {
     emit("update:modelValue", editor.getValue())

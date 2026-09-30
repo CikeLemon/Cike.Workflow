@@ -9,6 +9,11 @@ import ExpressionEditor from "../ExpressionEditor.vue"
 
 const props = defineProps<{ activity: unknown; designer: WorkflowDesignerState }>()
 
+// The script body is already edited as a Literal code block; wrapping it in a
+// Liquid/JavaScript expression is meaningless here, so the type switcher only
+// offers concrete values and name references.
+const SCRIPT_ALLOWED_TYPES = ["Literal", "Variable", "Input"]
+
 const activity = computed(() => props.activity as unknown as Record<string, { expression: ExpressionLike }>)
 
 function expr(key: string): ExpressionLike {
@@ -26,12 +31,13 @@ function parseOutcomes(raw: string): string[] {
 
 <template>
   <div class="space-y-2">
-    <ExpressionEditor :expression="expr('script')" :designer="designer" label="脚本" literal-default="">
+    <ExpressionEditor :expression="expr('script')" :designer="designer" label="脚本" :allowed-types="SCRIPT_ALLOWED_TYPES" literal-default="">
       <template #default="{ value, commit, readonly }">
         <CodeLiteralEditor
           language="javascript"
           :value="value"
           :readonly="readonly"
+          title="脚本"
           @blur="(raw) => { const to = coerceLiteralValue(value, raw); if (to !== undefined) commit(to) }"
         />
       </template>
