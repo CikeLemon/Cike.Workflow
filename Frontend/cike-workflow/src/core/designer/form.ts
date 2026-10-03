@@ -1,4 +1,5 @@
 import type { IActivity } from "../abstracts/Activity";
+import { resolveActivityClass } from "./registry";
 
 /**
  * Descriptor-driven generic form logic: resolve which activity fields are
@@ -57,6 +58,90 @@ export function resolveInputFields(activity: IActivity, descriptors: InputFieldD
     });
   }
   return resolved;
+}
+
+export interface OutputFieldDescriptorInput {
+  name?: string;
+  clrName?: string;
+  displayName?: string | null;
+  description?: string | null;
+  isBrowsable?: boolean | null;
+}
+
+/** An Output-shaped value: a memory block reference, no expression (CONTEXT.md「输出」). */
+export interface OutputBinding {
+  memoryBlockReference: { id: string };
+}
+
+export interface ResolvedOutputField {
+  /** Model field on the activity instance (camelCase). */
+  field: string;
+  label: string;
+  description: string | null;
+  /** The current binding, or null when the output is unbound. */
+  output: OutputBinding | null;
+}
+
+function isOutputShaped(value: unknown): value is OutputBinding {
+  if (typeof value !== "object" || value === null) return false;
+  const ref = (value as { memoryBlockReference?: unknown }).memoryBlockReference;
+  return typeof ref === "object" && ref !== null && typeof (ref as { id?: unknown }).id === "string";
+}
+
+/**
+ * Descriptor-driven output resolution, mirroring resolveInputFields: map each
+ * browsable output descriptor onto the activity field it names and read the
+ * current binding. Descriptors flagged non-browsable, or with no matching field,
+ * are dropped — so the panel hides the outputs section when nothing resolves.
+ */
+export function resolveOutputFields(
+  activity: IActivity,
+  descriptors: OutputFieldDescriptorInput[],
+): ResolvedOutputField[] {
+  // Resolve field presence against the activity's *declared* shape, not its live
+  // own properties: unbinding writes null through makeEditPropertyCommand, which
+  // deletes the own property (commands.ts drops null-valued keys). A deleted
+  // output must still resolve — as unbound — so its row stays visible and
+  // re-bindable (spec stories 7–8). A pristine instance of the mirrored class
+  // exposes exactly the declared output fields; unknown types fall back to the
+  // live object (their outputs ride the raw JSON bag, not declared fields).
+  const Ctor = resolveActivityClass(activity.type);
+  const shape: Record<string, unknown> = Ctor
+    ? (new Ctor() as unknown as Record<string, unknown>)
+    : (activity as unknown as Record<string, unknown>);
+  const resolved: ResolvedOutputField[] = [];
+  for (const descriptor of descriptors) {
+    if (descriptor.isBrowsable === false) continue;
+    const candidates = [descriptor.clrName, descriptor.name].filter((name): name is string => !!name);
+    const field = candidates.map(lowerFirst).find((name) => name in shape) ?? null;
+    if (!field) continue;
+    const value = (activity as unknown as Record<string, unknown>)[field];
+    resolved.push({
+      field,
+      label: descriptor.displayName ?? descriptor.name ?? field,
+      description: descriptor.description ?? null,
+      output: isOutputShaped(value) ? value : null,
+    });
+  }
+  return resolved;
+}
+
+/**
+ * Builds the value written to an activity's output field when binding it to a
+ * variable: a memory block reference keyed by the variable's stable id, so a
+ * rename never breaks the binding (CONTEXT.md「输出绑定」). A null id unbinds.
+ */
+export function makeOutputBinding(variableId: string | null): OutputBinding | null {
+  return variableId == null ? null : { memoryBlockReference: { id: variableId } };
+}
+
+/** Resolves a variable by its stable id; undefined when unbound or dangling. */
+export function findVariableById<T extends { id?: string }>(
+  variables: T[],
+  id: string | null | undefined,
+): T | undefined {
+  if (id == null) return undefined;
+  return variables.find((variable) => variable.id === id);
 }
 
 export const MERGE_MODES = ["Stream", "Merge", "Converge", "Cascade", "Race"] as const;

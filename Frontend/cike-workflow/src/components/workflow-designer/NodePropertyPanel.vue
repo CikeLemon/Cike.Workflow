@@ -10,6 +10,7 @@ import { activityShortName } from "@/core/designer/registry"
 import { getMergeMode, MERGE_MODES, setMergeMode } from "@/core/designer/form"
 import { FORM_REGISTRY } from "./forms"
 import GenericActivityForm from "./forms/GenericActivityForm.vue"
+import OutputsSection from "./OutputsSection.vue"
 
 /**
  * Node property content panel — renders the selected activity's form.
@@ -24,12 +25,14 @@ const typeShort = computed(() => (props.activity ? activityShortName(props.activ
 
 const dedicatedForm = computed(() => FORM_REGISTRY[typeShort.value] ?? null)
 
-const descriptors = computed(() => {
-  if (!props.activity) return []
+const descriptor = computed(() => {
+  if (!props.activity) return null
   const map = props.designer.descriptorByType.value
-  const descriptor = map.get(props.activity.type) ?? map.get(`Cike.${typeShort.value}`) ?? null
-  return descriptor?.inputs ?? []
+  return map.get(props.activity.type) ?? map.get(`Cike.${typeShort.value}`) ?? null
 })
+
+const descriptors = computed(() => descriptor.value?.inputs ?? [])
+const outputDescriptors = computed(() => descriptor.value?.outputs ?? [])
 
 const inboundCount = computed(() => {
   if (!props.activity) return 0
@@ -121,5 +124,7 @@ function commitMergeMode(mode: string): void {
       <div class="text-xs font-medium text-muted-foreground">输入属性</div>
       <GenericActivityForm :activity="activity" :descriptors="descriptors" :designer="designer" />
     </div>
+
+    <OutputsSection :activity="activity" :designer="designer" :descriptors="outputDescriptors" />
   </div>
 </template>

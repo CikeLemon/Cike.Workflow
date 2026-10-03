@@ -29,7 +29,7 @@ import {
   type DesignerCommand,
 } from "@/core/designer/commands"
 import { buildPaletteGroups, type PaletteGroup } from "@/core/designer/palette"
-import type { ExpressionDescriptor, InputDefinition, InputDescriptor, OutputDefinition, StorageDriverDescriptor, VariableDefinition, VariableTypeDescriptor } from "@/api/generated"
+import type { ExpressionDescriptor, InputDefinition, InputDescriptor, OutputDefinition, OutputDescriptor, StorageDriverDescriptor, VariableDefinition, VariableTypeDescriptor } from "@/api/generated"
 import { ensureDrillTarget, isChainContainer } from "@/core/designer/drill"
 import { resolveRevealPath } from "@/core/designer/reveal"
 import { projectOrderedChain, projectFlowchart, projectCanvas, canDrillInto, type CanvasProjection } from "@/core/designer/projection"
@@ -103,8 +103,9 @@ export function useWorkflowDesigner() {
    *  mutate plain nested arrays that Vue cannot track on its own. */
   const revision = ref(0)
   const paletteGroups = shallowRef<PaletteGroup[]>([])
-  /** Wire type → descriptor lookup (inputs drive the generic property form). */
-  const descriptorByType = shallowRef<Map<string, { inputs?: InputDescriptor[] }>>(new Map())
+  /** Wire type → descriptor lookup (inputs drive the generic property form;
+   *  outputs drive the node output-binding section). */
+  const descriptorByType = shallowRef<Map<string, { inputs?: InputDescriptor[]; outputs?: OutputDescriptor[] }>>(new Map())
   /** Wire type → backend icon name; enriches projected nodes for canvas rendering. */
   const iconByType = shallowRef<Map<string, string>>(new Map())
   /** Options-level workflow variables. */
@@ -354,13 +355,13 @@ export function useWorkflowDesigner() {
   async function loadPalette(): Promise<void> {
     try {
       const { data } = await getApiV1CommonsActivityDescriptors({})
-      const descriptors = (data ?? []) as Array<{ typeName?: string; inputs?: InputDescriptor[]; icon?: string | null }>
+      const descriptors = (data ?? []) as Array<{ typeName?: string; inputs?: InputDescriptor[]; outputs?: OutputDescriptor[]; icon?: string | null }>
       paletteGroups.value = buildPaletteGroups(descriptors)
-      const lookup = new Map<string, { inputs?: InputDescriptor[] }>()
+      const lookup = new Map<string, { inputs?: InputDescriptor[]; outputs?: OutputDescriptor[] }>()
       const icons = new Map<string, string>()
       for (const descriptor of descriptors) {
         if (!descriptor.typeName) continue
-        lookup.set(descriptor.typeName, { inputs: descriptor.inputs })
+        lookup.set(descriptor.typeName, { inputs: descriptor.inputs, outputs: descriptor.outputs })
         if (descriptor.icon) icons.set(descriptor.typeName, descriptor.icon)
       }
       descriptorByType.value = lookup

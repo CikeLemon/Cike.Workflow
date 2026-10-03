@@ -470,6 +470,30 @@ describe("useWorkflowDesigner reveal", () => {
   })
 })
 
+describe("useWorkflowDesigner activity descriptors", () => {
+  it("Load_CapturesOutputDescriptorsAlongsideInputs", async () => {
+    getDescriptors.mockResolvedValue({
+      data: [
+        {
+          typeName: "Cike.SendHttpRequest",
+          inputs: [{ clrName: "Url", name: "Url" }],
+          outputs: [{ clrName: "StatusCode", name: "StatusCode", displayName: "状态码" }],
+        },
+      ],
+    })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+    // loadPalette is fired without await inside load(); wait for it to settle.
+    await vi.waitFor(() => {
+      const descriptor = designer.descriptorByType.value.get("Cike.SendHttpRequest")
+      expect(descriptor?.inputs).toEqual([{ clrName: "Url", name: "Url" }])
+      expect(descriptor?.outputs).toEqual([
+        { clrName: "StatusCode", name: "StatusCode", displayName: "状态码" },
+      ])
+    })
+  })
+})
+
 describe("useWorkflowDesigner workflow config state", () => {
   function makeDetailWithOptions(options: Record<string, unknown>) {
     return { ...makeDetail(), options }
