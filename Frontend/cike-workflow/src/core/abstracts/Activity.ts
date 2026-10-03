@@ -1,4 +1,5 @@
 import type { ActivityPort } from "../models/ActivityPort";
+import type { Output } from "../models/Output";
 
 export interface IActivity {
   id: string;
@@ -40,5 +41,5 @@ export abstract class Activity implements IActivity {
 }
 
 export abstract class ActivityWithResult<T> extends Activity {
-  result: T | null = null;
+  result: Output<T> | null = null;
 }

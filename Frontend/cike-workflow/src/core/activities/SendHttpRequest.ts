@@ -1,6 +1,7 @@
 import { Activity } from "../abstracts/Activity";
 import { CustomHttpHeaders } from "../models/CustomHttpHeaders";
 import { Input } from "../models/Input";
+import { Output } from "../models/Output";
 
 export const DEFAULT_RESPONSE_ERROR_CODES: number[] = [
   400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414,
@@ -28,8 +29,8 @@ export class SendHttpRequest extends Activity {
   waitForCompletion: Input<boolean> = new Input<boolean>("Literal", false);
   suspendOnStatusCodes: Input<number[]> = new Input<number[]>("Literal", [202]);
 
-  statusCode: number | null = null;
-  parsedContent: any | null = null;
-  responseHeaders: CustomHttpHeaders | null = null;
-  callbackPayload: any | null = null;
+  statusCode: Output<number> | null = null;
+  parsedContent: Output<any> | null = null;
+  responseHeaders: Output<CustomHttpHeaders> | null = null;
+  callbackPayload: Output<any> | null = null;
 }
