@@ -3,7 +3,13 @@ import {
   getApiV1WorkflowInstancesById,
   getApiV1WorkflowDefinitionsById,
 } from "@/api/generated"
-import type { WorkflowInstanceDetailDto, WorkflowStatus } from "@/api/generated"
+import type {
+  ActivityStatus,
+  InputDefinition,
+  OutputDefinition,
+  WorkflowInstanceDetailDto,
+  WorkflowStatus,
+} from "@/api/generated"
 import { watch as signalrWatch, unwatch as signalrUnwatch, onProgress } from "@/composables/useSignalR"
 import {
   buildActivityStatusMap,
@@ -12,7 +18,6 @@ import {
   type ExecutionRecordLike,
   type ProgressEvent,
 } from "@/core/designer/execution"
-import type { ActivityStatus } from "@/api/generated"
 import { extractApiErrorMessage } from "@/lib/apiError"
 
 /**
@@ -37,6 +42,9 @@ export function useInstanceExecution(instanceId: string) {
   const loadError = ref<string | null>(null)
   const instance = ref<WorkflowInstanceDetailDto | null>(null)
   const definitionRoot = ref<unknown>(null)
+  /** Declared workflow arguments from the definition version's options (I/O schema). */
+  const inputDefs = ref<InputDefinition[]>([])
+  const outputDefs = ref<OutputDefinition[]>([])
   const statusMap: Ref<Map<string, ActivityStatus>> = ref(new Map())
   const instanceStatus = ref<WorkflowStatus | null>(null)
   const selectedActivityId = ref<string | null>(null)
@@ -84,6 +92,9 @@ export function useInstanceExecution(instanceId: string) {
           return
         }
         definitionRoot.value = (def.data as Record<string, unknown>).root ?? null
+        const options = (def.data as { options?: { inputs?: InputDefinition[]; outputs?: OutputDefinition[] } | null }).options
+        inputDefs.value = options?.inputs ?? []
+        outputDefs.value = options?.outputs ?? []
       }
 
       // Subscribe to real-time events
@@ -105,6 +116,8 @@ export function useInstanceExecution(instanceId: string) {
     loadError,
     instance,
     definitionRoot,
+    inputDefs,
+    outputDefs,
     statusMap,
     instanceStatus,
     selectedActivityId,

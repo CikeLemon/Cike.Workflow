@@ -48,11 +48,12 @@ function makeInstanceDto(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function makeDefinitionDto() {
+function makeDefinitionDto(overrides: Record<string, unknown> = {}) {
   return {
     id: "ver-100",
     root: { type: "Cike.Flowchart", id: "fc-root", name: "Root", activities: [], connections: [] },
     options: {},
+    ...overrides,
   }
 }
 
@@ -181,5 +182,31 @@ describe("useInstanceExecution", () => {
     await exec.load()
 
     expect(exec.loadError.value).toBe("实例不存在")
+  })
+
+  it("extracts declared inputs/outputs from the definition options", async () => {
+    mockGetDefinition.mockResolvedValue({
+      data: makeDefinitionDto({
+        options: {
+          inputs: [{ name: "number1", type: "Int32" }],
+          outputs: [{ name: "output1", type: "String" }],
+        },
+      }),
+      error: null,
+    })
+
+    const exec = useInstanceExecution("inst-1")
+    await exec.load()
+
+    expect(exec.inputDefs.value).toEqual([{ name: "number1", type: "Int32" }])
+    expect(exec.outputDefs.value).toEqual([{ name: "output1", type: "String" }])
+  })
+
+  it("leaves I/O schema empty when the definition declares none", async () => {
+    const exec = useInstanceExecution("inst-1")
+    await exec.load()
+
+    expect(exec.inputDefs.value).toEqual([])
+    expect(exec.outputDefs.value).toEqual([])
   })
 })

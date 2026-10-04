@@ -11,6 +11,10 @@ internal class StorageDriverManager(IStorageDriverRegistry storageDriverRegistry
 {
     public IStorageDriver? Find(string type)
     {
+        if (type.IsNullOrEmpty())
+        {
+            return null;
+        }
         var descriptor = storageDriverRegistry.Find(type);
         return descriptor?.Factory(serviceProvider);
     }

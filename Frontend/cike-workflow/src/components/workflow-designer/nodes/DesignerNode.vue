@@ -64,6 +64,10 @@ const statusBorderClass = computed(() => {
           class="rounded px-1.5 py-0.5 text-[10px] font-medium"
           :class="statusUi.class"
         >{{ statusUi.label }}</span>
+        <span
+          v-else-if="data.notRun"
+          class="rounded border border-dashed px-1.5 py-0.5 text-[10px] text-muted-foreground"
+        >未执行</span>
         <span v-else-if="data.isGeneric" class="text-[10px] text-muted-foreground">{{ data.typeShort }}</span>
         <span v-if="data.canDrill" class="flex cursor-pointer items-center" title="双击进入">
           <ChevronRight :size="14" class="text-muted-foreground" aria-label="可下钻" />

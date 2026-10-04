@@ -92,6 +92,38 @@ export function applyProgressEvent(
 }
 
 /**
+ * Format an ISO timestamp for compact display (locale date-time, seconds
+ * precision). Returns null for missing/invalid values so callers can hide the
+ * slot instead of rendering "Invalid Date". Also treats .NET's unset sentinel
+ * (DateTime.MinValue → year 1) as "no value" so a not-yet-finished instance
+ * does not show "结束 1/1/1".
+ */
+export function formatDateTime(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime()) || d.getFullYear() <= 1) return null
+  return d.toLocaleString()
+}
+
+/**
+ * Human-readable duration between two ISO timestamps (e.g. "1.2s", "350ms",
+ * "2分 5秒"). Returns null when either side is missing/invalid or negative.
+ */
+export function formatDuration(startIso: string | null | undefined, endIso: string | null | undefined): string | null {
+  if (!startIso || !endIso) return null
+  const start = new Date(startIso).getTime()
+  const end = new Date(endIso).getTime()
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null
+  const ms = end - start
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+  const totalSeconds = Math.round(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return seconds > 0 ? `${minutes}分 ${seconds}秒` : `${minutes}分`
+}
+
+/**
  * Given chronologically-ordered execution records, return the latest one
  * for the specified activityId. Returns undefined if no match.
  */

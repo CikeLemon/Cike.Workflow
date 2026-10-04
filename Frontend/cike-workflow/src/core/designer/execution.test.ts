@@ -4,6 +4,8 @@ import {
   getLatestRecord,
   applyProgressEvent,
   extractActivityIdFromNodeId,
+  formatDateTime,
+  formatDuration,
   type ExecutionRecordLike,
   type ProgressEvent,
 } from "./execution"
@@ -123,5 +125,45 @@ describe("applyProgressEvent", () => {
     const event: ProgressEvent = { type: 1, activityNodeId: "a-http" }
     applyProgressEvent(map, event)
     expect(map.get("a-http")).toBe(1) // original unchanged
+  })
+})
+
+describe("formatDateTime", () => {
+  it("formats a valid ISO timestamp", () => {
+    expect(formatDateTime("2026-01-01T08:30:00Z")).toBeTruthy()
+  })
+
+  it("returns null for missing or invalid values", () => {
+    expect(formatDateTime(null)).toBeNull()
+    expect(formatDateTime(undefined)).toBeNull()
+    expect(formatDateTime("")).toBeNull()
+    expect(formatDateTime("not-a-date")).toBeNull()
+  })
+
+  it("treats .NET DateTime.MinValue (unset finishedAt) as no value", () => {
+    expect(formatDateTime("0001-01-01T00:00:00")).toBeNull()
+    expect(formatDateTime("0001-01-01T00:00:00Z")).toBeNull()
+  })
+})
+
+describe("formatDuration", () => {
+  it("formats sub-second durations in ms", () => {
+    expect(formatDuration("2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.350Z")).toBe("350ms")
+  })
+
+  it("formats sub-minute durations in seconds", () => {
+    expect(formatDuration("2026-01-01T00:00:00Z", "2026-01-01T00:00:01.200Z")).toBe("1.2s")
+  })
+
+  it("formats multi-minute durations in 分/秒", () => {
+    expect(formatDuration("2026-01-01T00:00:00Z", "2026-01-01T00:02:05Z")).toBe("2分 5秒")
+    expect(formatDuration("2026-01-01T00:00:00Z", "2026-01-01T00:02:00Z")).toBe("2分")
+  })
+
+  it("returns null when either side is missing, invalid, or negative", () => {
+    expect(formatDuration(null, "2026-01-01T00:00:01Z")).toBeNull()
+    expect(formatDuration("2026-01-01T00:00:00Z", undefined)).toBeNull()
+    expect(formatDuration("bad", "2026-01-01T00:00:01Z")).toBeNull()
+    expect(formatDuration("2026-01-01T00:00:02Z", "2026-01-01T00:00:01Z")).toBeNull()
   })
 })

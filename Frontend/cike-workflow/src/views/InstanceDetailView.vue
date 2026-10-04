@@ -22,7 +22,8 @@ import {
 } from "@/core/designer/projection"
 import { ensureDrillTarget, isChainContainer } from "@/core/designer/drill"
 import { activityShortName } from "@/core/designer/registry"
-import { ACTIVITY_STATUS_UI } from "@/core/designer/execution"
+import { ACTIVITY_STATUS_UI, formatDateTime, formatDuration } from "@/core/designer/execution"
+import InstanceIoSection from "@/components/InstanceIoSection.vue"
 import type { IActivity } from "@/core/abstracts/Activity"
 
 const route = useRoute()
@@ -114,11 +115,18 @@ const projection = computed<CanvasProjection>(() => {
         : { nodes: [], edges: [] }
 
   const statusMap = exec.statusMap.value
+  // On the read-only instance canvas every node must show a status, so the set
+  // is closed: nodes with no execution record yet get an explicit "未执行"
+  // badge (accurate whether the instance is still running or already terminal).
   return {
     edges: base.edges,
     nodes: base.nodes.map((node) => ({
       ...node,
-      data: { ...node.data, status: statusMap.get(node.data.activityId) ?? null },
+      data: {
+        ...node.data,
+        status: statusMap.get(node.data.activityId) ?? null,
+        notRun: !statusMap.has(node.data.activityId),
+      },
     })),
   }
 })
@@ -176,6 +184,13 @@ const statusBadge = computed(() => {
   return s != null ? instanceStatusUi[s] : null
 })
 
+// Header timeline: start / end / elapsed, derived from the instance snapshot.
+const startTimeText = computed(() => formatDateTime(exec.instance.value?.createdAt))
+const endTimeText = computed(() => formatDateTime(exec.instance.value?.finishedAt))
+const durationText = computed(() =>
+  formatDuration(exec.instance.value?.createdAt, exec.instance.value?.finishedAt),
+)
+
 function goBack(): void {
   router.push({ name: "instances", params: { workspaceId } })
 }
@@ -194,6 +209,13 @@ const recordStatusUi = computed(() => {
   const s = selectedRecord.value?.status as ActivityStatus | undefined
   return s != null ? ACTIVITY_STATUS_UI[s] : null
 })
+
+// ---------------------------------------------------------------------------
+// Workflow I/O (schema-driven, see InstanceIoSection)
+// ---------------------------------------------------------------------------
+const stateAvailable = computed(() => exec.instance.value?.workflowState != null)
+const inputValues = computed(() => exec.instance.value?.workflowState?.input)
+const outputValues = computed(() => exec.instance.value?.workflowState?.output)
 </script>
 
 <template>
@@ -204,6 +226,7 @@ const recordStatusUi = computed(() => {
         <ArrowLeft :size="16" />
       </Button>
       <Badge v-if="statusBadge" :class="statusBadge.class">{{ statusBadge.label }}</Badge>
+      <Badge v-if="exec.instance.value?.isDebug" variant="outline" class="px-1.5 py-0 text-[10px] font-normal text-muted-foreground">调试</Badge>
       <span class="truncate text-sm font-medium">{{ exec.instance.value?.name || `实例 ${instanceId}` }}</span>
       <div class="flex items-center gap-4 text-xs text-muted-foreground">
         <RouterLink
@@ -214,6 +237,9 @@ const recordStatusUi = computed(() => {
           {{ exec.instance.value?.definitionName || "查看定义" }}
         </RouterLink>
         <span v-if="exec.instance.value?.version">版本 <span class="font-mono">v{{ exec.instance.value.version }}</span></span>
+        <span v-if="startTimeText">开始 <span class="font-mono">{{ startTimeText }}</span></span>
+        <span v-if="endTimeText">结束 <span class="font-mono">{{ endTimeText }}</span></span>
+        <span v-if="durationText">耗时 <span class="font-mono">{{ durationText }}</span></span>
         <span v-if="exec.instance.value?.correlationId">关联 ID <span class="font-mono">{{ exec.instance.value.correlationId }}</span></span>
       </div>
     </header>
@@ -269,19 +295,26 @@ const recordStatusUi = computed(() => {
                 <h4 class="mb-1 text-xs font-semibold text-muted-foreground">状态</h4>
                 <Badge v-if="statusBadge" :class="statusBadge.class">{{ statusBadge.label }}</Badge>
               </section>
-              <section v-if="exec.instance.value?.workflowState?.input">
-                <h4 class="mb-1 text-xs font-semibold text-muted-foreground">工作流输入</h4>
-                <pre class="max-h-40 overflow-auto rounded bg-muted/50 p-2 text-xs font-mono">{{ jsonDisplay(exec.instance.value.workflowState.input) }}</pre>
-              </section>
-              <section v-if="exec.instance.value?.workflowState?.output">
-                <h4 class="mb-1 text-xs font-semibold text-muted-foreground">工作流输出</h4>
-                <pre class="max-h-40 overflow-auto rounded bg-muted/50 p-2 text-xs font-mono">{{ jsonDisplay(exec.instance.value.workflowState.output) }}</pre>
-              </section>
+              <InstanceIoSection
+                title="工作流输入"
+                :defs="exec.inputDefs.value"
+                :values="inputValues"
+                :state-available="stateAvailable"
+              />
+              <InstanceIoSection
+                title="工作流输出"
+                :defs="exec.outputDefs.value"
+                :values="outputValues"
+                :state-available="stateAvailable"
+              />
               <section class="space-y-1 text-xs text-muted-foreground">
                 <h4 class="font-semibold">元信息</h4>
                 <p v-if="exec.instance.value?.correlationId">关联 ID: <span class="font-mono">{{ exec.instance.value.correlationId }}</span></p>
-                <p v-if="exec.instance.value?.createdAt">创建时间: {{ exec.instance.value.createdAt }}</p>
+                <p v-if="startTimeText">开始时间: {{ startTimeText }}</p>
+                <p v-if="endTimeText">结束时间: {{ endTimeText }}</p>
+                <p v-if="durationText">耗时: {{ durationText }}</p>
                 <p v-if="exec.instance.value?.version">定义版本: v{{ exec.instance.value.version }}</p>
+                <p v-if="exec.instance.value?.isDebug">来源: 调试运行</p>
               </section>
             </div>
 

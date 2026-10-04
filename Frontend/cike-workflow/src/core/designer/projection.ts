@@ -31,6 +31,11 @@ export interface DesignerNodeData {
   canDrill: boolean;
   /** Run status when shown on a read-only instance canvas (0..4); else absent. */
   status?: import("@/api/generated").ActivityStatus | null;
+  /** True when this activity has no execution record on the read-only instance
+   *  canvas — rendered as an explicit "未执行" badge so every node shows a
+   *  status. Only ever set by the instance projection; the designer leaves it
+   *  undefined. */
+  notRun?: boolean;
   /** True when backend canvas validation flagged this activity (error badge). */
   hasError?: boolean;
 }
