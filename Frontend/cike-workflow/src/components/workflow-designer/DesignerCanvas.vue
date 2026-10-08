@@ -100,9 +100,10 @@ function addInsertTool(edgeId: string): void {
         { tagName: "circle", selector: "button", attrs: { r: 10, class: "insert-btn-circle", "data-insert-btn": "" } },
         { tagName: "path", selector: "icon", attrs: { d: "M -4 0 H 4 M 0 -4 V 4", class: "insert-btn-icon" } },
       ],
-      onClick: (evt: MouseEvent) => {
-        evt.stopPropagation()
-        onInsertButtonClick(evt, edgeId)
+      onClick: ({ e }: { e: MouseEvent }) => {
+        // X6's Button tool already stopPropagation+preventDefault on the
+        // mousedown it fires this from, so panning is suppressed for free.
+        onInsertButtonClick(e, edgeId)
       },
     },
   })
@@ -223,13 +224,17 @@ onMounted(() => {
   })
   renderProjection()
   applyViewport()
-  // The insert button lives inside the edge view: swallow its mousedown/click
-  // before X6's delegated handlers so the click neither pans nor selects.
-  const guard = (event: Event): void => {
+  // The insert button lives on X6's decorator layer, but its tool container
+  // carries data-cell-id, so a click on it would still resolve to the edge and
+  // fire edge:click (mis-selecting) or blank:click (deselecting). X6's Button
+  // tool already stops the MOUSEDOWN (no pan); we additionally swallow the
+  // button's CLICK in the capture phase. We must NOT guard mousedown here: X6
+  // fires the tool's onClick from its own mousedown handler, and a capture-phase
+  // mousedown guard would stop it before the button ever runs.
+  const guardClick = (event: Event): void => {
     if ((event.target as Element).closest?.("[data-insert-btn]")) event.stopPropagation()
   }
-  containerRef.value!.addEventListener("mousedown", guard, true)
-  containerRef.value!.addEventListener("click", guard, true)
+  containerRef.value!.addEventListener("click", guardClick, true)
 })
 
 watch(() => props.insertMenuEdgeId, (edgeId, previous) => {
