@@ -1,28 +1,3 @@
-<script setup lang="ts">
-import { computed } from "vue"
-import { Input as UiInput } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
-import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
-import type { ExpressionLike } from "@/core/designer/expression"
-import ExpressionEditor from "../ExpressionEditor.vue"
-
-const props = defineProps<{ activity: unknown; designer: WorkflowDesignerState }>()
-
-const fields = computed(() => props.activity as unknown as Record<string, { expression: ExpressionLike }>)
-
-function expr(key: string): ExpressionLike {
-  return fields.value[key].expression
-}
-
-function num(value: unknown): string {
-  return value == null ? "" : String(value)
-}
-
-function toNumber(raw: string): unknown {
-  return raw === "" ? null : Number(raw)
-}
-</script>
-
 <template>
   <div class="space-y-2">
     <ExpressionEditor :expression="expr('start')" :designer="designer" label="起始值" :literal-default="0">
@@ -49,3 +24,28 @@ function toNumber(raw: string): unknown {
     </ExpressionEditor>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed } from "vue"
+import { Input as UiInput } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
+import type { ExpressionLike } from "@/core/designer/expression"
+import ExpressionEditor from "../ExpressionEditor.vue"
+
+const props = defineProps<{ activity: unknown; designer: WorkflowDesignerState }>()
+
+const fields = computed(() => props.activity as unknown as Record<string, { expression: ExpressionLike }>)
+
+function expr(key: string): ExpressionLike {
+  return fields.value[key].expression
+}
+
+function num(value: unknown): string {
+  return value == null ? "" : String(value)
+}
+
+function toNumber(raw: string): unknown {
+  return raw === "" ? null : Number(raw)
+}
+</script>

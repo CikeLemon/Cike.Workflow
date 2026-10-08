@@ -1,36 +1,3 @@
-<script setup lang="ts">
-import { computed } from "vue"
-import { Input as UiInput } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
-import {
-  defaultLiteralValue,
-  type ConditionDataType,
-  type ConditionOperand,
-} from "@/core/designer/conditionCompile"
-import ExpressionEditor from "./ExpressionEditor.vue"
-
-/**
- * One operand (left or right of a comparison). Reuses the unified ExpressionEditor
- * (ADR 0010) with the operand whitelist Literal / Variable / Input; the Literal value
- * widget is dataType-driven and supplied through ExpressionEditor's Literal slot.
- * value/type edits are owned by ExpressionEditor (it writes through the command
- * stack); dataType is operand-local metadata ExpressionEditor doesn't know, so a
- * dataType change emits a controlled change up to the group editor.
- */
-const props = defineProps<{ operand: ConditionOperand; designer: WorkflowDesignerState; readonly?: boolean }>()
-const emit = defineEmits<{ change: [ConditionOperand] }>()
-
-const OPERAND_TYPES = ["Literal", "Variable", "Input"]
-
-const dataType = computed<ConditionDataType>(() => props.operand.dataType ?? "string")
-
-function setDataType(dt: ConditionDataType): void {
-  emit("change", { ...props.operand, dataType: dt, value: defaultLiteralValue(dt) })
-}
-</script>
-
 <template>
   <ExpressionEditor
     :expression="operand"
@@ -84,3 +51,36 @@ function setDataType(dt: ConditionDataType): void {
     </template>
   </ExpressionEditor>
 </template>
+
+<script setup lang="ts">
+import { computed } from "vue"
+import { Input as UiInput } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
+import {
+  defaultLiteralValue,
+  type ConditionDataType,
+  type ConditionOperand,
+} from "@/core/designer/conditionCompile"
+import ExpressionEditor from "./ExpressionEditor.vue"
+
+/**
+ * One operand (left or right of a comparison). Reuses the unified ExpressionEditor
+ * (ADR 0010) with the operand whitelist Literal / Variable / Input; the Literal value
+ * widget is dataType-driven and supplied through ExpressionEditor's Literal slot.
+ * value/type edits are owned by ExpressionEditor (it writes through the command
+ * stack); dataType is operand-local metadata ExpressionEditor doesn't know, so a
+ * dataType change emits a controlled change up to the group editor.
+ */
+const props = defineProps<{ operand: ConditionOperand; designer: WorkflowDesignerState; readonly?: boolean }>()
+const emit = defineEmits<{ change: [ConditionOperand] }>()
+
+const OPERAND_TYPES = ["Literal", "Variable", "Input"]
+
+const dataType = computed<ConditionDataType>(() => props.operand.dataType ?? "string")
+
+function setDataType(dt: ConditionDataType): void {
+  emit("change", { ...props.operand, dataType: dt, value: defaultLiteralValue(dt) })
+}
+</script>

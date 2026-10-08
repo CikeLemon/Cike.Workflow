@@ -1,30 +1,3 @@
-<script setup lang="ts">
-import { computed } from "vue"
-import type { Node } from "@antv/x6"
-import { ChevronRight, CircleAlert } from "@lucide/vue"
-import type { DesignerNodeData } from "@/core/designer/projection"
-import { ACTIVITY_STATUS_UI } from "@/core/designer/execution"
-import { resolveActivityIcon } from "./icons"
-
-const props = defineProps<{ node: Node }>()
-
-const data = computed(() => props.node.getData() as DesignerNodeData & { selected?: boolean })
-
-const icon = computed(() => resolveActivityIcon(data.value.icon))
-
-const statusUi = computed(() => (data.value.status != null ? ACTIVITY_STATUS_UI[data.value.status] : null))
-
-/** Runtime status border: Running = pulse, Faulted = red. Lower priority than selected/error. */
-const statusBorderClass = computed(() => {
-  if (data.value.selected || data.value.hasError) return ""
-  switch (data.value.status) {
-    case 1: return "border-info animate-pulse"
-    case 4: return "border-destructive ring-1 ring-destructive/35"
-    default: return ""
-  }
-})
-</script>
-
 <template>
   <div class="relative h-full w-full">
     <!-- Drill affordance: an in-bounds "under-card" peeking at the bottom edge,
@@ -76,3 +49,30 @@ const statusBorderClass = computed(() => {
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed } from "vue"
+import type { Node } from "@antv/x6"
+import { ChevronRight, CircleAlert } from "@lucide/vue"
+import type { DesignerNodeData } from "@/core/designer/projection"
+import { ACTIVITY_STATUS_UI } from "@/core/designer/execution"
+import { resolveActivityIcon } from "./icons"
+
+const props = defineProps<{ node: Node }>()
+
+const data = computed(() => props.node.getData() as DesignerNodeData & { selected?: boolean })
+
+const icon = computed(() => resolveActivityIcon(data.value.icon))
+
+const statusUi = computed(() => (data.value.status != null ? ACTIVITY_STATUS_UI[data.value.status] : null))
+
+/** Runtime status border: Running = pulse, Faulted = red. Lower priority than selected/error. */
+const statusBorderClass = computed(() => {
+  if (data.value.selected || data.value.hasError) return ""
+  switch (data.value.status) {
+    case 1: return "border-info animate-pulse"
+    case 4: return "border-destructive ring-1 ring-destructive/35"
+    default: return ""
+  }
+})
+</script>

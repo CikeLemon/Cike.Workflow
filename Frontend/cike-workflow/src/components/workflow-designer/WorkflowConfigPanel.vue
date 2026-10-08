@@ -1,235 +1,3 @@
-<script setup lang="ts">
-import { computed, ref } from "vue"
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, Trash2 } from "@lucide/vue"
-import { Button } from "@/components/ui/button"
-import { Input as UiInput } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
-import type { Expression, InputDefinition, OutputDefinition, VariableDefinition } from "@/api/generated"
-import ExpressionEditor from "./ExpressionEditor.vue"
-
-/**
- * Workflow Configuration panel (ADR 0008): read-only basic info + CRUD sections
- * for variables, inputs, outputs, and outcomes. All mutations flow through the
- * designer command stack for undo/redo and validation.
- */
-const props = defineProps<{ designer: WorkflowDesignerState }>()
-
-const isReadonly = computed(() => props.designer.readonly.value)
-
-// Collapsible section state
-const sections = ref({
-  variables: true,
-  inputs: true,
-  outputs: true,
-  outcomes: true,
-})
-
-function toggleSection(key: keyof typeof sections.value): void {
-  sections.value[key] = !sections.value[key]
-}
-
-// --- Variables ---
-const variables = computed(() => props.designer.variables.value)
-
-function addVariable(): void {
-  if (isReadonly.value) return
-  const list = [...variables.value, { id: crypto.randomUUID(), name: "", typeName: "String", isArray: false }]
-  props.designer.setVariables(list)
-}
-
-function removeVariable(index: number): void {
-  if (isReadonly.value) return
-  const list = variables.value.filter((_, i) => i !== index)
-  props.designer.setVariables(list)
-}
-
-function updateVariable(index: number, patch: Partial<VariableDefinition>): void {
-  if (isReadonly.value) return
-  const list = variables.value.map((v, i) => (i === index ? { ...v, ...patch } : v))
-  props.designer.setVariables(list)
-}
-
-function commitVariableRename(index: number, newName: string): void {
-  if (isReadonly.value) return
-  const old = variables.value[index]
-  if (!old || old.name === newName) return
-  if (newName && old.name) {
-    props.designer.renameReference("Variable", old.name, newName)
-  } else {
-    updateVariable(index, { name: newName })
-  }
-}
-
-// --- Inputs ---
-const inputs = computed(() => props.designer.inputs.value)
-
-function addInput(): void {
-  if (isReadonly.value) return
-  const list: InputDefinition[] = [...inputs.value, { name: "", type: "String", isArray: false }]
-  props.designer.setInputs(list)
-}
-
-function removeInput(index: number): void {
-  if (isReadonly.value) return
-  const list = inputs.value.filter((_, i) => i !== index)
-  props.designer.setInputs(list)
-}
-
-function updateInput(index: number, patch: Partial<InputDefinition>): void {
-  if (isReadonly.value) return
-  const list = inputs.value.map((item, i) => (i === index ? { ...item, ...patch } : item))
-  props.designer.setInputs(list)
-}
-
-function commitInputRename(index: number, newName: string): void {
-  if (isReadonly.value) return
-  const old = inputs.value[index]
-  if (!old || old.name === newName) return
-  if (newName && old.name) {
-    props.designer.renameReference("Input", old.name, newName)
-  } else {
-    updateInput(index, { name: newName })
-  }
-}
-
-// --- Outputs ---
-const outputs = computed(() => props.designer.outputs.value)
-
-function addOutput(): void {
-  if (isReadonly.value) return
-  const list: OutputDefinition[] = [...outputs.value, { name: "", type: "String", isArray: false }]
-  props.designer.setOutputs(list)
-}
-
-function removeOutput(index: number): void {
-  if (isReadonly.value) return
-  const list = outputs.value.filter((_, i) => i !== index)
-  props.designer.setOutputs(list)
-}
-
-function updateOutput(index: number, patch: Partial<OutputDefinition>): void {
-  if (isReadonly.value) return
-  const list = outputs.value.map((item, i) => (i === index ? { ...item, ...patch } : item))
-  props.designer.setOutputs(list)
-}
-
-// --- Outcomes ---
-const outcomes = computed(() => props.designer.outcomes.value)
-
-function addOutcome(): void {
-  if (isReadonly.value) return
-  props.designer.setOutcomes([...outcomes.value, ""])
-}
-
-function removeOutcome(index: number): void {
-  if (isReadonly.value) return
-  props.designer.setOutcomes(outcomes.value.filter((_, i) => i !== index))
-}
-
-function updateOutcome(index: number, value: string): void {
-  if (isReadonly.value) return
-  const list = outcomes.value.map((item, i) => (i === index ? value : item))
-  props.designer.setOutcomes(list)
-}
-
-// --- Type selector options ---
-const typeOptions = computed(() => props.designer.variableTypes.value)
-
-// --- Storage driver selector options ---
-/** Effective driver when a definition has none set explicitly: the backend default. */
-const DEFAULT_STORAGE_DRIVER = "WorkflowInstance"
-const storageDriverOptions = computed(() => props.designer.storageDrivers.value)
-
-// --- Default expression editing (ADR 0009) ---
-/** Input defaults may only be Literal/Liquid/JavaScript; outputs allow all types. */
-const INPUT_DEFAULT_ALLOWED_TYPES = ["Literal", "Liquid", "Javascript"]
-
-/**
- * Materializes an argument's defaultValue into a live expression object so the
- * ExpressionEditor can edit it in place through the command stack — the same
- * pattern node forms use. listRef and savedOptions share the item reference,
- * so edits land in the save payload without an extra list commit.
- */
-function ensureDefaultValue(
-  listRef: { value: Array<{ defaultValue?: Expression }> },
-  index: number,
-  label: string,
-): void {
-  if (isReadonly.value) return
-  const item = listRef.value[index]
-  if (!item || item.defaultValue) return
-  props.designer.executeCommand({
-    label,
-    apply: () => {
-      item.defaultValue = { type: "Literal", value: null }
-    },
-    undo: () => {
-      delete item.defaultValue
-    },
-    redo: () => {
-      item.defaultValue = { type: "Literal", value: null }
-    },
-  })
-}
-
-// --- Reordering ---
-function moveItem<T>(list: T[], index: number, direction: -1 | 1): T[] {
-  const target = index + direction
-  if (target < 0 || target >= list.length) return list
-  const next = [...list]
-  ;[next[index], next[target]] = [next[target]!, next[index]!]
-  return next
-}
-
-function moveVariable(index: number, direction: -1 | 1): void {
-  if (isReadonly.value) return
-  props.designer.setVariables(moveItem(variables.value, index, direction))
-}
-
-function moveInput(index: number, direction: -1 | 1): void {
-  if (isReadonly.value) return
-  props.designer.setInputs(moveItem(inputs.value, index, direction))
-}
-
-function moveOutput(index: number, direction: -1 | 1): void {
-  if (isReadonly.value) return
-  props.designer.setOutputs(moveItem(outputs.value, index, direction))
-}
-
-function moveOutcome(index: number, direction: -1 | 1): void {
-  if (isReadonly.value) return
-  props.designer.setOutcomes(moveItem(outcomes.value, index, direction))
-}
-
-// --- Advanced field expansion per item ---
-const expandedAdvanced = ref<Set<string>>(new Set())
-
-function toggleAdvanced(id: string): void {
-  const next = new Set(expandedAdvanced.value)
-  if (next.has(id)) {
-    next.delete(id)
-  } else {
-    // Materialize the default expression when an argument editor first opens,
-    // so the ExpressionEditor always has a live object to bind to.
-    if (id.startsWith("in-")) ensureDefaultValue(inputs, Number(id.slice(3)), "初始化输入默认值")
-    else if (id.startsWith("out-")) ensureDefaultValue(outputs, Number(id.slice(4)), "初始化输出默认值")
-    next.add(id)
-  }
-  expandedAdvanced.value = next
-}
-
-// Definition type display
-const DEFINITION_TYPE_LABELS: Record<number, string> = { 1: "工作流", 2: "Agent 工作流", 3: "审批" }
-const definitionTypeLabel = computed(() => {
-  const t = props.designer.definitionType.value
-  return t ? (DEFINITION_TYPE_LABELS[t] ?? String(t)) : "—"
-})
-</script>
-
 <template>
   <div class="space-y-0 divide-y">
     <!-- Basic Info (read-only) -->
@@ -629,3 +397,235 @@ const definitionTypeLabel = computed(() => {
     </section>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed, ref } from "vue"
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, Trash2 } from "@lucide/vue"
+import { Button } from "@/components/ui/button"
+import { Input as UiInput } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
+import type { Expression, InputDefinition, OutputDefinition, VariableDefinition } from "@/api/generated"
+import ExpressionEditor from "./ExpressionEditor.vue"
+
+/**
+ * Workflow Configuration panel (ADR 0008): read-only basic info + CRUD sections
+ * for variables, inputs, outputs, and outcomes. All mutations flow through the
+ * designer command stack for undo/redo and validation.
+ */
+const props = defineProps<{ designer: WorkflowDesignerState }>()
+
+const isReadonly = computed(() => props.designer.readonly.value)
+
+// Collapsible section state
+const sections = ref({
+  variables: true,
+  inputs: true,
+  outputs: true,
+  outcomes: true,
+})
+
+function toggleSection(key: keyof typeof sections.value): void {
+  sections.value[key] = !sections.value[key]
+}
+
+// --- Variables ---
+const variables = computed(() => props.designer.variables.value)
+
+function addVariable(): void {
+  if (isReadonly.value) return
+  const list = [...variables.value, { id: crypto.randomUUID(), name: "", typeName: "String", isArray: false }]
+  props.designer.setVariables(list)
+}
+
+function removeVariable(index: number): void {
+  if (isReadonly.value) return
+  const list = variables.value.filter((_, i) => i !== index)
+  props.designer.setVariables(list)
+}
+
+function updateVariable(index: number, patch: Partial<VariableDefinition>): void {
+  if (isReadonly.value) return
+  const list = variables.value.map((v, i) => (i === index ? { ...v, ...patch } : v))
+  props.designer.setVariables(list)
+}
+
+function commitVariableRename(index: number, newName: string): void {
+  if (isReadonly.value) return
+  const old = variables.value[index]
+  if (!old || old.name === newName) return
+  if (newName && old.name) {
+    props.designer.renameReference("Variable", old.name, newName)
+  } else {
+    updateVariable(index, { name: newName })
+  }
+}
+
+// --- Inputs ---
+const inputs = computed(() => props.designer.inputs.value)
+
+function addInput(): void {
+  if (isReadonly.value) return
+  const list: InputDefinition[] = [...inputs.value, { name: "", type: "String", isArray: false }]
+  props.designer.setInputs(list)
+}
+
+function removeInput(index: number): void {
+  if (isReadonly.value) return
+  const list = inputs.value.filter((_, i) => i !== index)
+  props.designer.setInputs(list)
+}
+
+function updateInput(index: number, patch: Partial<InputDefinition>): void {
+  if (isReadonly.value) return
+  const list = inputs.value.map((item, i) => (i === index ? { ...item, ...patch } : item))
+  props.designer.setInputs(list)
+}
+
+function commitInputRename(index: number, newName: string): void {
+  if (isReadonly.value) return
+  const old = inputs.value[index]
+  if (!old || old.name === newName) return
+  if (newName && old.name) {
+    props.designer.renameReference("Input", old.name, newName)
+  } else {
+    updateInput(index, { name: newName })
+  }
+}
+
+// --- Outputs ---
+const outputs = computed(() => props.designer.outputs.value)
+
+function addOutput(): void {
+  if (isReadonly.value) return
+  const list: OutputDefinition[] = [...outputs.value, { name: "", type: "String", isArray: false }]
+  props.designer.setOutputs(list)
+}
+
+function removeOutput(index: number): void {
+  if (isReadonly.value) return
+  const list = outputs.value.filter((_, i) => i !== index)
+  props.designer.setOutputs(list)
+}
+
+function updateOutput(index: number, patch: Partial<OutputDefinition>): void {
+  if (isReadonly.value) return
+  const list = outputs.value.map((item, i) => (i === index ? { ...item, ...patch } : item))
+  props.designer.setOutputs(list)
+}
+
+// --- Outcomes ---
+const outcomes = computed(() => props.designer.outcomes.value)
+
+function addOutcome(): void {
+  if (isReadonly.value) return
+  props.designer.setOutcomes([...outcomes.value, ""])
+}
+
+function removeOutcome(index: number): void {
+  if (isReadonly.value) return
+  props.designer.setOutcomes(outcomes.value.filter((_, i) => i !== index))
+}
+
+function updateOutcome(index: number, value: string): void {
+  if (isReadonly.value) return
+  const list = outcomes.value.map((item, i) => (i === index ? value : item))
+  props.designer.setOutcomes(list)
+}
+
+// --- Type selector options ---
+const typeOptions = computed(() => props.designer.variableTypes.value)
+
+// --- Storage driver selector options ---
+/** Effective driver when a definition has none set explicitly: the backend default. */
+const DEFAULT_STORAGE_DRIVER = "WorkflowInstance"
+const storageDriverOptions = computed(() => props.designer.storageDrivers.value)
+
+// --- Default expression editing (ADR 0009) ---
+/** Input defaults may only be Literal/Liquid/JavaScript; outputs allow all types. */
+const INPUT_DEFAULT_ALLOWED_TYPES = ["Literal", "Liquid", "Javascript"]
+
+/**
+ * Materializes an argument's defaultValue into a live expression object so the
+ * ExpressionEditor can edit it in place through the command stack — the same
+ * pattern node forms use. listRef and savedOptions share the item reference,
+ * so edits land in the save payload without an extra list commit.
+ */
+function ensureDefaultValue(
+  listRef: { value: Array<{ defaultValue?: Expression }> },
+  index: number,
+  label: string,
+): void {
+  if (isReadonly.value) return
+  const item = listRef.value[index]
+  if (!item || item.defaultValue) return
+  props.designer.executeCommand({
+    label,
+    apply: () => {
+      item.defaultValue = { type: "Literal", value: null }
+    },
+    undo: () => {
+      delete item.defaultValue
+    },
+    redo: () => {
+      item.defaultValue = { type: "Literal", value: null }
+    },
+  })
+}
+
+// --- Reordering ---
+function moveItem<T>(list: T[], index: number, direction: -1 | 1): T[] {
+  const target = index + direction
+  if (target < 0 || target >= list.length) return list
+  const next = [...list]
+  ;[next[index], next[target]] = [next[target]!, next[index]!]
+  return next
+}
+
+function moveVariable(index: number, direction: -1 | 1): void {
+  if (isReadonly.value) return
+  props.designer.setVariables(moveItem(variables.value, index, direction))
+}
+
+function moveInput(index: number, direction: -1 | 1): void {
+  if (isReadonly.value) return
+  props.designer.setInputs(moveItem(inputs.value, index, direction))
+}
+
+function moveOutput(index: number, direction: -1 | 1): void {
+  if (isReadonly.value) return
+  props.designer.setOutputs(moveItem(outputs.value, index, direction))
+}
+
+function moveOutcome(index: number, direction: -1 | 1): void {
+  if (isReadonly.value) return
+  props.designer.setOutcomes(moveItem(outcomes.value, index, direction))
+}
+
+// --- Advanced field expansion per item ---
+const expandedAdvanced = ref<Set<string>>(new Set())
+
+function toggleAdvanced(id: string): void {
+  const next = new Set(expandedAdvanced.value)
+  if (next.has(id)) {
+    next.delete(id)
+  } else {
+    // Materialize the default expression when an argument editor first opens,
+    // so the ExpressionEditor always has a live object to bind to.
+    if (id.startsWith("in-")) ensureDefaultValue(inputs, Number(id.slice(3)), "初始化输入默认值")
+    else if (id.startsWith("out-")) ensureDefaultValue(outputs, Number(id.slice(4)), "初始化输出默认值")
+    next.add(id)
+  }
+  expandedAdvanced.value = next
+}
+
+// Definition type display
+const DEFINITION_TYPE_LABELS: Record<number, string> = { 1: "工作流", 2: "Agent 工作流", 3: "审批" }
+const definitionTypeLabel = computed(() => {
+  const t = props.designer.definitionType.value
+  return t ? (DEFINITION_TYPE_LABELS[t] ?? String(t)) : "—"
+})
+</script>

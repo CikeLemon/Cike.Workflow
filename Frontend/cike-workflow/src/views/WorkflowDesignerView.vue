@@ -1,3 +1,12 @@
+<template>
+  <div class="h-full min-h-0">
+    <div v-if="designer.loading.value" class="flex h-full items-center justify-center text-sm text-muted-foreground">
+      加载中…
+    </div>
+    <WorkflowDesigner v-else :designer="designer" />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { onMounted, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
@@ -27,12 +36,3 @@ watch(
   },
 )
 </script>
-
-<template>
-  <div class="h-full min-h-0">
-    <div v-if="designer.loading.value" class="flex h-full items-center justify-center text-sm text-muted-foreground">
-      加载中…
-    </div>
-    <WorkflowDesigner v-else :designer="designer" />
-  </div>
-</template>

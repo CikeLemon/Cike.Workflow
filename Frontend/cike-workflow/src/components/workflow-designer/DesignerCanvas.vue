@@ -1,3 +1,8 @@
+<template>
+  <div ref="containerRef" class="canvas-surface h-full w-full bg-muted/20" @dragover.prevent @drop="onDrop" />
+  <component :is="TeleportContainer" v-if="TeleportContainer" />
+</template>
+
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { Graph, Snapline, Transform, type Node as X6Node } from "@antv/x6"
@@ -238,11 +243,6 @@ function removeCellById(cellId: string): void {
 
 defineExpose({ viewportCenter, removeCellById })
 </script>
-
-<template>
-  <div ref="containerRef" class="canvas-surface h-full w-full bg-muted/20" @dragover.prevent @drop="onDrop" />
-  <component :is="TeleportContainer" v-if="TeleportContainer" />
-</template>
 
 <!-- Theme-aware edge/port styling: SVG presentation attributes cannot use
      CSS variables, so colors are applied through currentColor + CSS. -->

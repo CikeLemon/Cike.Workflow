@@ -1,36 +1,3 @@
-<script setup lang="ts">
-import { ref } from "vue"
-import { PanelLeftClose, PanelLeftOpen } from "@lucide/vue"
-import { usePanelResize } from "@/composables/usePanelResize"
-import type { PaletteGroup } from "@/core/designer/palette"
-import { resolveActivityIcon } from "./nodes/icons"
-
-defineProps<{ groups: PaletteGroup[] }>()
-
-/** Collapsible like an IDE side panel: collapsed leaves a thin rail to reopen. */
-const open = ref(true)
-
-/** 展开态宽度：右缘拖拽调整、双击复位，跨会话持久化。 */
-const { size: panelWidth, onPointerDown: onResizeStart, onDoubleClick: onResizeReset } = usePanelResize({
-  axis: "width",
-  defaultSize: 224,
-  min: 160,
-  max: 420,
-  storageKey: "cike.dock.size.palette",
-})
-
-const emit = defineEmits<{
-  add: [typeName: string]
-  dragstart: [payload: { typeName: string; event: DragEvent }]
-}>()
-
-function onDragStart(typeName: string, event: DragEvent): void {
-  event.dataTransfer?.setData("cike-activity-type", typeName)
-  event.dataTransfer?.setData("text/plain", typeName)
-  emit("dragstart", { typeName, event })
-}
-</script>
-
 <template>
   <aside v-if="open" class="relative flex shrink-0 flex-col border-r" :style="{ width: `${panelWidth}px` }">
     <div class="flex shrink-0 items-center border-b bg-background px-3 py-2 text-xs font-medium text-muted-foreground">
@@ -86,3 +53,36 @@ function onDragStart(typeName: string, event: DragEvent): void {
     </button>
   </aside>
 </template>
+
+<script setup lang="ts">
+import { ref } from "vue"
+import { PanelLeftClose, PanelLeftOpen } from "@lucide/vue"
+import { usePanelResize } from "@/composables/usePanelResize"
+import type { PaletteGroup } from "@/core/designer/palette"
+import { resolveActivityIcon } from "./nodes/icons"
+
+defineProps<{ groups: PaletteGroup[] }>()
+
+/** Collapsible like an IDE side panel: collapsed leaves a thin rail to reopen. */
+const open = ref(true)
+
+/** 展开态宽度：右缘拖拽调整、双击复位，跨会话持久化。 */
+const { size: panelWidth, onPointerDown: onResizeStart, onDoubleClick: onResizeReset } = usePanelResize({
+  axis: "width",
+  defaultSize: 224,
+  min: 160,
+  max: 420,
+  storageKey: "cike.dock.size.palette",
+})
+
+const emit = defineEmits<{
+  add: [typeName: string]
+  dragstart: [payload: { typeName: string; event: DragEvent }]
+}>()
+
+function onDragStart(typeName: string, event: DragEvent): void {
+  event.dataTransfer?.setData("cike-activity-type", typeName)
+  event.dataTransfer?.setData("text/plain", typeName)
+  emit("dragstart", { typeName, event })
+}
+</script>

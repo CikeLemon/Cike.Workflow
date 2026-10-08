@@ -1,3 +1,37 @@
+<template>
+  <Dialog :open="open" @update:open="emit('update:open', $event)">
+    <DialogContent class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>{{ folder?.id ? '重命名目录' : '新建目录' }}</DialogTitle>
+        <DialogDescription>
+          {{ folder?.id ? '修改目录名称' : '在当前目录下创建新的目录' }}
+        </DialogDescription>
+      </DialogHeader>
+
+      <form @submit="onSubmit" class="space-y-4">
+        <FormField v-slot="{ componentField }" name="name">
+          <FormItem>
+            <FormLabel>目录名称</FormLabel>
+            <FormControl>
+              <Input placeholder="如 报销流程" autofocus v-bind="componentField" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" @click="close">
+            取消
+          </Button>
+          <Button type="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? '提交中...' : (folder?.id ? '保存' : '创建') }}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>
+</template>
+
 <script setup lang="ts">
 import { watch } from "vue"
 import { useForm } from "vee-validate"
@@ -77,37 +111,3 @@ const onSubmit = handleSubmit(async (values) => {
   emit("saved")
 })
 </script>
-
-<template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle>{{ folder?.id ? '重命名目录' : '新建目录' }}</DialogTitle>
-        <DialogDescription>
-          {{ folder?.id ? '修改目录名称' : '在当前目录下创建新的目录' }}
-        </DialogDescription>
-      </DialogHeader>
-
-      <form @submit="onSubmit" class="space-y-4">
-        <FormField v-slot="{ componentField }" name="name">
-          <FormItem>
-            <FormLabel>目录名称</FormLabel>
-            <FormControl>
-              <Input placeholder="如 报销流程" autofocus v-bind="componentField" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" @click="close">
-            取消
-          </Button>
-          <Button type="submit" :disabled="isSubmitting">
-            {{ isSubmitting ? '提交中...' : (folder?.id ? '保存' : '创建') }}
-          </Button>
-        </DialogFooter>
-      </form>
-    </DialogContent>
-  </Dialog>
-</template>

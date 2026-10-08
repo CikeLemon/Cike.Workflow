@@ -1,11 +1,3 @@
-<script setup lang="ts">
-import { Sun, Moon } from "@lucide/vue"
-import { Button } from "@/components/ui/button"
-import { useTheme } from "@/composables/useTheme"
-
-const { isDark, toggleTheme } = useTheme()
-</script>
-
 <template>
   <Button
     variant="ghost"
@@ -17,3 +9,11 @@ const { isDark, toggleTheme } = useTheme()
     <Sun v-else />
   </Button>
 </template>
+
+<script setup lang="ts">
+import { Sun, Moon } from "@lucide/vue"
+import { Button } from "@/components/ui/button"
+import { useTheme } from "@/composables/useTheme"
+
+const { isDark, toggleTheme } = useTheme()
+</script>

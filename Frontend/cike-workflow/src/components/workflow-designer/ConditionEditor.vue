@@ -1,3 +1,60 @@
+<template>
+  <div class="space-y-1.5">
+    <Label v-if="label" class="text-xs">{{ label }}</Label>
+
+    <div class="flex items-start gap-2">
+      <div class="min-w-0 flex-1">
+        <ConditionGroupEditor
+          v-if="spec.type === 'custom'"
+          :group="(spec.value as ConditionGroup) ?? emptyGroup()"
+          :designer="designer"
+          :readonly="readonly"
+          @change="onGroupChange"
+        />
+
+        <ExpressionEditor
+          v-else
+          :expression="spec"
+          :designer="designer"
+          :allowed-types="ESCAPE_TYPES"
+          :literal-default="false"
+          :readonly="readonly"
+          hide-type-switcher
+        >
+          <template #default="{ value, commit, readonly: ro }">
+            <div class="flex h-8 items-center gap-2">
+              <Switch :model-value="value === true" :disabled="ro" @update:model-value="(v: boolean) => commit(v)" />
+              <span class="text-xs text-muted-foreground">{{ value === true ? "True" : "False" }}</span>
+            </div>
+          </template>
+        </ExpressionEditor>
+      </div>
+
+      <!-- Top-level type switcher: ExpressionEditor-styled icon button at the trailing end. -->
+      <Select
+        :model-value="spec.type"
+        :disabled="readonly"
+        @update:model-value="(t) => onTypeChange(t as ConditionSpec['type'])"
+      >
+        <SelectTriggerPrimitive
+          :title="currentOption.label"
+          class="text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0"
+        >
+          <component :is="currentOption.icon" />
+        </SelectTriggerPrimitive>
+        <SelectContent>
+          <SelectItem v-for="opt in TYPE_OPTIONS" :key="opt.type" :value="opt.type" class="text-xs">
+            <span class="flex items-center gap-2">
+              <component :is="opt.icon" class="size-4 shrink-0 text-muted-foreground" />
+              {{ opt.label }}
+            </span>
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, type Component } from "vue"
 import { SelectTrigger as SelectTriggerPrimitive } from "reka-ui"
@@ -67,60 +124,3 @@ function onGroupChange(group: ConditionGroup): void {
   emit("change", { type: "custom", value: group })
 }
 </script>
-
-<template>
-  <div class="space-y-1.5">
-    <Label v-if="label" class="text-xs">{{ label }}</Label>
-
-    <div class="flex items-start gap-2">
-      <div class="min-w-0 flex-1">
-        <ConditionGroupEditor
-          v-if="spec.type === 'custom'"
-          :group="(spec.value as ConditionGroup) ?? emptyGroup()"
-          :designer="designer"
-          :readonly="readonly"
-          @change="onGroupChange"
-        />
-
-        <ExpressionEditor
-          v-else
-          :expression="spec"
-          :designer="designer"
-          :allowed-types="ESCAPE_TYPES"
-          :literal-default="false"
-          :readonly="readonly"
-          hide-type-switcher
-        >
-          <template #default="{ value, commit, readonly: ro }">
-            <div class="flex h-8 items-center gap-2">
-              <Switch :model-value="value === true" :disabled="ro" @update:model-value="(v: boolean) => commit(v)" />
-              <span class="text-xs text-muted-foreground">{{ value === true ? "True" : "False" }}</span>
-            </div>
-          </template>
-        </ExpressionEditor>
-      </div>
-
-      <!-- Top-level type switcher: ExpressionEditor-styled icon button at the trailing end. -->
-      <Select
-        :model-value="spec.type"
-        :disabled="readonly"
-        @update:model-value="(t) => onTypeChange(t as ConditionSpec['type'])"
-      >
-        <SelectTriggerPrimitive
-          :title="currentOption.label"
-          class="text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0"
-        >
-          <component :is="currentOption.icon" />
-        </SelectTriggerPrimitive>
-        <SelectContent>
-          <SelectItem v-for="opt in TYPE_OPTIONS" :key="opt.type" :value="opt.type" class="text-xs">
-            <span class="flex items-center gap-2">
-              <component :is="opt.icon" class="size-4 shrink-0 text-muted-foreground" />
-              {{ opt.label }}
-            </span>
-          </SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
-</template>

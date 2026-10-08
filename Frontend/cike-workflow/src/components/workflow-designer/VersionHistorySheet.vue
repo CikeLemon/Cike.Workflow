@@ -1,61 +1,3 @@
-<script setup lang="ts">
-import { ref } from "vue"
-import { History } from "@lucide/vue"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
-
-const props = defineProps<{ designer: WorkflowDesignerState; open: boolean }>()
-
-const emit = defineEmits<{ "update:open": [open: boolean] }>()
-
-const rollbackTargetId = ref<string | null>(null)
-const rollbackConfirmOpen = ref(false)
-
-function formatDate(value?: string): string {
-  if (!value) return "—"
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString()
-}
-
-async function view(rowId?: string) {
-  if (!rowId) return
-  await props.designer.viewVersion(rowId)
-  emit("update:open", false)
-}
-
-function requestRollback(rowId?: string) {
-  if (!rowId) return
-  rollbackTargetId.value = rowId
-  rollbackConfirmOpen.value = true
-}
-
-async function confirmRollback() {
-  const target = rollbackTargetId.value
-  rollbackTargetId.value = null
-  if (!target) return
-  await props.designer.rollback(target)
-  emit("update:open", false)
-}
-</script>
-
 <template>
   <Sheet :open="open" @update:open="(value: boolean) => emit('update:open', value)">
     <SheetContent class="w-full gap-0 sm:max-w-md">
@@ -136,3 +78,61 @@ async function confirmRollback() {
     </AlertDialogContent>
   </AlertDialog>
 </template>
+
+<script setup lang="ts">
+import { ref } from "vue"
+import { History } from "@lucide/vue"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
+
+const props = defineProps<{ designer: WorkflowDesignerState; open: boolean }>()
+
+const emit = defineEmits<{ "update:open": [open: boolean] }>()
+
+const rollbackTargetId = ref<string | null>(null)
+const rollbackConfirmOpen = ref(false)
+
+function formatDate(value?: string): string {
+  if (!value) return "—"
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString()
+}
+
+async function view(rowId?: string) {
+  if (!rowId) return
+  await props.designer.viewVersion(rowId)
+  emit("update:open", false)
+}
+
+function requestRollback(rowId?: string) {
+  if (!rowId) return
+  rollbackTargetId.value = rowId
+  rollbackConfirmOpen.value = true
+}
+
+async function confirmRollback() {
+  const target = rollbackTargetId.value
+  rollbackTargetId.value = null
+  if (!target) return
+  await props.designer.rollback(target)
+  emit("update:open", false)
+}
+</script>

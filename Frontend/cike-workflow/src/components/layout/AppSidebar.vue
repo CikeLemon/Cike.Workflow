@@ -1,32 +1,3 @@
-<script setup lang="ts">
-import { RouterLink, useRoute } from "vue-router"
-import { LayoutDashboard, Boxes } from "@lucide/vue"
-import {
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarRail,
-} from "@/components/ui/sidebar"
-
-const route = useRoute()
-
-const menuItems = [
-  { label: "首页", to: "/", icon: LayoutDashboard, name: "home" },
-  { label: "空间管理", to: "/workspaces", icon: Boxes, name: "workspaces" },
-] as const
-
-function isActive(name: string) {
-  if (name === "home") return route.name === "home"
-  // "workspaces" matches all workspace-related routes
-  return route.path.startsWith("/workspaces") || route.name === name
-}
-</script>
-
 <template>
   <Sidebar collapsible="icon">
     <SidebarHeader>
@@ -62,3 +33,32 @@ function isActive(name: string) {
     <SidebarRail />
   </Sidebar>
 </template>
+
+<script setup lang="ts">
+import { RouterLink, useRoute } from "vue-router"
+import { LayoutDashboard, Boxes } from "@lucide/vue"
+import {
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarRail,
+} from "@/components/ui/sidebar"
+
+const route = useRoute()
+
+const menuItems = [
+  { label: "首页", to: "/", icon: LayoutDashboard, name: "home" },
+  { label: "空间管理", to: "/workspaces", icon: Boxes, name: "workspaces" },
+] as const
+
+function isActive(name: string) {
+  if (name === "home") return route.name === "home"
+  // "workspaces" matches all workspace-related routes
+  return route.path.startsWith("/workspaces") || route.name === name
+}
+</script>

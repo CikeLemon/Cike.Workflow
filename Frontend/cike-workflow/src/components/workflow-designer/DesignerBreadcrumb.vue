@@ -1,11 +1,3 @@
-<script setup lang="ts">
-import { ChevronRight } from "@lucide/vue"
-
-defineProps<{ entries: string[] }>()
-
-const emit = defineEmits<{ select: [index: number] }>()
-</script>
-
 <template>
   <nav class="flex min-w-0 items-center gap-1 text-sm">
     <template v-for="(entry, index) in entries" :key="index">
@@ -23,3 +15,11 @@ const emit = defineEmits<{ select: [index: number] }>()
     </template>
   </nav>
 </template>
+
+<script setup lang="ts">
+import { ChevronRight } from "@lucide/vue"
+
+defineProps<{ entries: string[] }>()
+
+const emit = defineEmits<{ select: [index: number] }>()
+</script>

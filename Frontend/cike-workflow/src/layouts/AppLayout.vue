@@ -1,9 +1,3 @@
-<script setup lang="ts">
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import AppSidebar from "@/components/layout/AppSidebar.vue"
-import AppHeader from "@/components/layout/AppHeader.vue"
-</script>
-
 <template>
   <SidebarProvider class="h-svh overflow-hidden">
     <AppSidebar />
@@ -19,3 +13,9 @@ import AppHeader from "@/components/layout/AppHeader.vue"
     </SidebarInset>
   </SidebarProvider>
 </template>
+
+<script setup lang="ts">
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
+import AppSidebar from "@/components/layout/AppSidebar.vue"
+import AppHeader from "@/components/layout/AppHeader.vue"
+</script>

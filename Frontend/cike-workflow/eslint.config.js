@@ -31,6 +31,8 @@ export default [
         },
       ],
       'vue/multi-word-component-names': 'off',
+      // Enforce SFC top-level block order: template -> script -> style.
+      'vue/block-order': ['error', { order: ['template', 'script', 'style'] }],
       'vue/max-attributes-per-line': 'off',
       'vue/attributes-order': 'off',
       'vue/singleline-html-element-content-newline': 'off',
@@ -39,5 +41,15 @@ export default [
       "vue/html-self-closing": 'off',
       "@typescript-eslint/no-unused-vars": 'off',
     }
+  },
+
+  {
+    // shadcn-vue CLI generates src/components/ui/** as script-first; do not
+    // hand-modify or re-order these generated components.
+    name: 'app/ui-generated-exempt',
+    files: ['src/components/ui/**/*.vue'],
+    rules: {
+      'vue/block-order': 'off',
+    },
   }
 ]

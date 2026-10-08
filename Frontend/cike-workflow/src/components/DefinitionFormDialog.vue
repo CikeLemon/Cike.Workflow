@@ -1,3 +1,104 @@
+<template>
+  <Dialog :open="open" @update:open="emit('update:open', $event)">
+    <DialogContent class="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>{{ definition?.id ? '编辑定义' : '新建定义' }}</DialogTitle>
+        <DialogDescription>
+          {{ definition?.id ? '修改工作流定义的基本信息' : '在当前目录下创建新的工作流定义' }}
+        </DialogDescription>
+      </DialogHeader>
+
+      <form @submit="onSubmit" class="space-y-4 min-w-0">
+        <FormField v-slot="{ componentField }" name="definitionId">
+          <FormItem>
+            <FormLabel>定义 ID</FormLabel>
+            <FormControl>
+              <Input
+                :disabled="!!definition?.id"
+                placeholder="留空则由系统自动生成"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormMessage />
+            <p v-if="!definition?.id" class="text-xs text-muted-foreground">
+              可选。自定义工作流定义的唯一标识，留空则由后端自动生成。
+            </p>
+          </FormItem>
+        </FormField>
+
+        <FormField v-slot="{ componentField }" name="name">
+          <FormItem>
+            <FormLabel>名称</FormLabel>
+            <FormControl>
+              <Input placeholder="如 月度报销审批" v-bind="componentField" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+
+        <FormField v-slot="{ componentField }" name="description">
+          <FormItem>
+            <FormLabel>描述</FormLabel>
+            <FormControl>
+              <Textarea
+                placeholder="简要描述该定义的用途"
+                rows="3"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+
+        <div class="grid grid-cols-2 gap-4">
+          <FormField v-slot="{ value, handleChange }" name="type">
+            <FormItem>
+              <FormLabel>类型</FormLabel>
+              <Select :model-value="String(value)" @update:model-value="(v) => handleChange(Number(v))">
+                <FormControl>
+                  <SelectTrigger class="w-full">
+                    <SelectValue placeholder="选择类型" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem v-for="opt in typeOptions" :key="opt.value" :value="String(opt.value)">
+                    {{ opt.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
+          <FormField v-slot="{ value, handleChange }" name="usableAsActivity">
+            <FormItem>
+              <FormLabel>可作为活动使用</FormLabel>
+              <div class="flex h-9 items-center gap-2">
+                <FormControl>
+                  <Switch :model-value="value" @update:model-value="handleChange" />
+                </FormControl>
+                <span class="text-sm text-muted-foreground">
+                  {{ value ? '是' : '否' }}
+                </span>
+              </div>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" @click="close">
+            取消
+          </Button>
+          <Button type="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? '提交中...' : (definition?.id ? '保存' : '创建') }}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>
+</template>
+
 <script setup lang="ts">
 import { watch } from "vue"
 import { useForm } from "vee-validate"
@@ -123,104 +224,3 @@ const onSubmit = handleSubmit(async (values) => {
   emit("saved")
 })
 </script>
-
-<template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="sm:max-w-lg">
-      <DialogHeader>
-        <DialogTitle>{{ definition?.id ? '编辑定义' : '新建定义' }}</DialogTitle>
-        <DialogDescription>
-          {{ definition?.id ? '修改工作流定义的基本信息' : '在当前目录下创建新的工作流定义' }}
-        </DialogDescription>
-      </DialogHeader>
-
-      <form @submit="onSubmit" class="space-y-4 min-w-0">
-        <FormField v-slot="{ componentField }" name="definitionId">
-          <FormItem>
-            <FormLabel>定义 ID</FormLabel>
-            <FormControl>
-              <Input
-                :disabled="!!definition?.id"
-                placeholder="留空则由系统自动生成"
-                v-bind="componentField"
-              />
-            </FormControl>
-            <FormMessage />
-            <p v-if="!definition?.id" class="text-xs text-muted-foreground">
-              可选。自定义工作流定义的唯一标识，留空则由后端自动生成。
-            </p>
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ componentField }" name="name">
-          <FormItem>
-            <FormLabel>名称</FormLabel>
-            <FormControl>
-              <Input placeholder="如 月度报销审批" v-bind="componentField" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ componentField }" name="description">
-          <FormItem>
-            <FormLabel>描述</FormLabel>
-            <FormControl>
-              <Textarea
-                placeholder="简要描述该定义的用途"
-                rows="3"
-                v-bind="componentField"
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
-        <div class="grid grid-cols-2 gap-4">
-          <FormField v-slot="{ value, handleChange }" name="type">
-            <FormItem>
-              <FormLabel>类型</FormLabel>
-              <Select :model-value="String(value)" @update:model-value="(v) => handleChange(Number(v))">
-                <FormControl>
-                  <SelectTrigger class="w-full">
-                    <SelectValue placeholder="选择类型" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem v-for="opt in typeOptions" :key="opt.value" :value="String(opt.value)">
-                    {{ opt.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <FormField v-slot="{ value, handleChange }" name="usableAsActivity">
-            <FormItem>
-              <FormLabel>可作为活动使用</FormLabel>
-              <div class="flex h-9 items-center gap-2">
-                <FormControl>
-                  <Switch :model-value="value" @update:model-value="handleChange" />
-                </FormControl>
-                <span class="text-sm text-muted-foreground">
-                  {{ value ? '是' : '否' }}
-                </span>
-              </div>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" @click="close">
-            取消
-          </Button>
-          <Button type="submit" :disabled="isSubmitting">
-            {{ isSubmitting ? '提交中...' : (definition?.id ? '保存' : '创建') }}
-          </Button>
-        </DialogFooter>
-      </form>
-    </DialogContent>
-  </Dialog>
-</template>

@@ -1,3 +1,152 @@
+<template>
+  <div class="flex h-full min-h-0 flex-col">
+    <header class="flex shrink-0 items-center justify-between border-b px-4 py-2">
+      <div class="flex min-w-0 items-center gap-3">
+        <Button variant="ghost" size="icon" title="返回" @click="goBack">
+          <ArrowLeft :size="16" />
+        </Button>
+        <div class="flex min-w-0 items-center gap-2">
+          <span class="truncate text-sm font-medium">{{ designer.definitionName.value }}</span>
+          <Badge variant="secondary" class="font-mono">v{{ designer.version.value }}</Badge>
+          <Badge v-if="designer.isPublished.value" class="bg-success/15 text-success border-transparent">已发布</Badge>
+        </div>
+        <DesignerBreadcrumb :entries="designer.breadcrumb.value" @select="(index: number) => designer.popTo(index)" />
+        <span
+          v-if="designer.readonly.value"
+          class="flex shrink-0 items-center gap-2 rounded bg-info/15 px-2 py-0.5 text-xs text-info"
+        >
+          正在查看 v{{ designer.version.value }}（只读）
+          <button type="button" class="inline-flex items-center gap-1 font-medium hover:underline" @click="designer.returnToLatest()">
+            <RotateCcw :size="12" /> 返回最新
+          </button>
+        </span>
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <Button variant="ghost" size="icon" :disabled="!designer.canUndo.value || designer.readonly.value" title="撤销" @click="designer.undo()">
+          <Undo2 :size="16" />
+        </Button>
+        <Button variant="ghost" size="icon" :disabled="!designer.canRedo.value || designer.readonly.value" title="重做" @click="designer.redo()">
+          <Redo2 :size="16" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          :disabled="!designer.selectedActivityId.value || designer.readonly.value"
+          title="删除节点"
+          @click="designer.selectedActivityId.value && requestRemove(designer.selectedActivityId.value)"
+        >
+          <Trash2 :size="16" />
+        </Button>
+        <div class="mx-1 h-5 w-px bg-border" />
+        <ThemeToggle />
+        <Button variant="ghost" size="icon" title="历史版本" @click="historyOpen = true">
+          <History :size="16" />
+        </Button>
+        <Button variant="outline" size="sm" :disabled="designer.readonly.value" @click="editOpen = true">
+          <Pencil :size="14" /> 编辑
+        </Button>
+        <Button size="sm" variant="ghost" :disabled="designer.saving.value || designer.readonly.value" @click="designer.save()">
+          {{ designer.saving.value ? "保存中…" : "保存" }}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="!designer.canDebug.value || designer.saving.value"
+          :title="designer.canDebug.value ? '调试运行' : '已发布版本不能直接调试，请先保存草稿'"
+          @click="debugOpen = true"
+        >
+          <Play :size="14" /> 调试
+        </Button>
+        <Button size="sm" :disabled="designer.readonly.value || designer.saving.value" @click="onPublishClick">
+          <Upload :size="14" /> 发布
+        </Button>
+      </div>
+    </header>
+    <div class="flex min-h-0 flex-1">
+      <ActivityPalette v-if="!designer.readonly.value" :groups="designer.paletteGroups.value" @add="(typeName: string) => addAtCenter(typeName)" />
+      <div class="flex min-w-0 flex-1 flex-col">
+        <div class="relative min-h-0 flex-1">
+          <DesignerCanvas
+            ref="canvasRef"
+            :projection="designer.projection.value"
+            :interactive="!designer.readonly.value"
+            :selected-id="designer.selectedActivityId.value"
+            :entry-key="entryKey"
+            :entry-activity="designer.currentEntry.value?.activity ?? null"
+            @node-click="(id: string) => { designer.selectedActivityId.value = id || null; designer.selectedEdgeId.value = null }"
+            @node-dblclick="(id: string) => drillById(id)"
+            @node-moved="(payload) => designer.moveNode(payload)"
+            @node-resized="(payload) => designer.resizeNode(payload)"
+            @viewport-changed="(state) => designer.saveViewport(state)"
+            @drop-activity="(payload) => designer.addNode(payload.typeName, { x: payload.x, y: payload.y })"
+            @edge-click="(edgeId: string) => { designer.selectedActivityId.value = null; designer.selectedEdgeId.value = edgeId }"
+            @connect-request="onConnectRequest"
+          />
+          <!-- Failure banner is a notification, not content: capped height with
+               internal scroll and a dismiss button so a backend stack trace can
+               never bury the canvas. -->
+          <div
+            v-if="bannerError && !errorBannerDismissed"
+            role="alert"
+            class="absolute inset-x-0 top-0 z-10 border-b border-destructive/40 bg-destructive/10 backdrop-blur-sm"
+          >
+            <button
+              type="button"
+              class="absolute right-2 top-2 rounded p-0.5 text-destructive hover:bg-destructive/20"
+              title="关闭"
+              @click="errorBannerDismissed = true"
+            >
+              <X :size="14" />
+            </button>
+            <div class="max-h-32 overflow-y-auto px-4 py-2 pr-9 text-xs whitespace-pre-wrap break-words text-destructive">
+              {{ bannerError }}
+            </div>
+          </div>
+          <div
+            v-if="designer.lastSavedAt.value"
+            class="absolute bottom-2 right-2 rounded bg-background/90 border px-2 py-1 text-xs text-muted-foreground"
+          >
+            已保存 {{ designer.lastSavedAt.value.toLocaleTimeString() }}
+          </div>
+        </div>
+        <!-- 底部 dock 只占画布列（VS Code/IntelliJ 惯例）：侧栏保持全高，仅画布为它让高度。 -->
+        <ProblemListPanel
+          v-if="!designer.readonly.value"
+          :problems="designer.problems.value"
+          :validating="designer.validating.value"
+          :validation-error="designer.validationError.value"
+          :open="problemPanelOpen"
+          @update:open="(open: boolean) => (problemPanelOpen = open)"
+          @reveal="(problem) => designer.revealActivity(problem)"
+        />
+      </div>
+      <RightToolDock :designer="designer" />
+    </div>
+
+    <PublishDialog :designer="designer" :open="publishOpen" @update:open="(open: boolean) => (publishOpen = open)" />
+
+    <DebugRunDialog
+      :open="debugOpen"
+      :inputs="designer.inputs.value"
+      :running="debugRunning"
+      :error="debugError"
+      @update:open="(open: boolean) => (debugOpen = open)"
+      @confirm="onDebugConfirm"
+    />
+
+    <VersionHistorySheet :designer="designer" :open="historyOpen" @update:open="(open: boolean) => (historyOpen = open)" />
+
+    <DefinitionFormDialog
+      :open="editOpen"
+      :definition="editDefinition"
+      :folder-id="designer.folderId.value"
+      :workspace-id="workspaceId"
+      @update:open="(open: boolean) => (editOpen = open)"
+      @saved="onMetadataSaved"
+    />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
@@ -158,152 +307,3 @@ function onKeydown(event: KeyboardEvent): void {
 onMounted(() => window.addEventListener("keydown", onKeydown))
 onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown))
 </script>
-
-<template>
-  <div class="flex h-full min-h-0 flex-col">
-    <header class="flex shrink-0 items-center justify-between border-b px-4 py-2">
-      <div class="flex min-w-0 items-center gap-3">
-        <Button variant="ghost" size="icon" title="返回" @click="goBack">
-          <ArrowLeft :size="16" />
-        </Button>
-        <div class="flex min-w-0 items-center gap-2">
-          <span class="truncate text-sm font-medium">{{ designer.definitionName.value }}</span>
-          <Badge variant="secondary" class="font-mono">v{{ designer.version.value }}</Badge>
-          <Badge v-if="designer.isPublished.value" class="bg-success/15 text-success border-transparent">已发布</Badge>
-        </div>
-        <DesignerBreadcrumb :entries="designer.breadcrumb.value" @select="(index: number) => designer.popTo(index)" />
-        <span
-          v-if="designer.readonly.value"
-          class="flex shrink-0 items-center gap-2 rounded bg-info/15 px-2 py-0.5 text-xs text-info"
-        >
-          正在查看 v{{ designer.version.value }}（只读）
-          <button type="button" class="inline-flex items-center gap-1 font-medium hover:underline" @click="designer.returnToLatest()">
-            <RotateCcw :size="12" /> 返回最新
-          </button>
-        </span>
-      </div>
-      <div class="flex shrink-0 items-center gap-2">
-        <Button variant="ghost" size="icon" :disabled="!designer.canUndo.value || designer.readonly.value" title="撤销" @click="designer.undo()">
-          <Undo2 :size="16" />
-        </Button>
-        <Button variant="ghost" size="icon" :disabled="!designer.canRedo.value || designer.readonly.value" title="重做" @click="designer.redo()">
-          <Redo2 :size="16" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          :disabled="!designer.selectedActivityId.value || designer.readonly.value"
-          title="删除节点"
-          @click="designer.selectedActivityId.value && requestRemove(designer.selectedActivityId.value)"
-        >
-          <Trash2 :size="16" />
-        </Button>
-        <div class="mx-1 h-5 w-px bg-border" />
-        <ThemeToggle />
-        <Button variant="ghost" size="icon" title="历史版本" @click="historyOpen = true">
-          <History :size="16" />
-        </Button>
-        <Button variant="outline" size="sm" :disabled="designer.readonly.value" @click="editOpen = true">
-          <Pencil :size="14" /> 编辑
-        </Button>
-        <Button size="sm" variant="ghost" :disabled="designer.saving.value || designer.readonly.value" @click="designer.save()">
-          {{ designer.saving.value ? "保存中…" : "保存" }}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          :disabled="!designer.canDebug.value || designer.saving.value"
-          :title="designer.canDebug.value ? '调试运行' : '已发布版本不能直接调试，请先保存草稿'"
-          @click="debugOpen = true"
-        >
-          <Play :size="14" /> 调试
-        </Button>
-        <Button size="sm" :disabled="designer.readonly.value || designer.saving.value" @click="onPublishClick">
-          <Upload :size="14" /> 发布
-        </Button>
-      </div>
-    </header>
-    <div class="flex min-h-0 flex-1">
-      <ActivityPalette v-if="!designer.readonly.value" :groups="designer.paletteGroups.value" @add="(typeName: string) => addAtCenter(typeName)" />
-      <div class="flex min-w-0 flex-1 flex-col">
-        <div class="relative min-h-0 flex-1">
-          <DesignerCanvas
-            ref="canvasRef"
-            :projection="designer.projection.value"
-            :interactive="!designer.readonly.value"
-            :selected-id="designer.selectedActivityId.value"
-            :entry-key="entryKey"
-            :entry-activity="designer.currentEntry.value?.activity ?? null"
-            @node-click="(id: string) => { designer.selectedActivityId.value = id || null; designer.selectedEdgeId.value = null }"
-            @node-dblclick="(id: string) => drillById(id)"
-            @node-moved="(payload) => designer.moveNode(payload)"
-            @node-resized="(payload) => designer.resizeNode(payload)"
-            @viewport-changed="(state) => designer.saveViewport(state)"
-            @drop-activity="(payload) => designer.addNode(payload.typeName, { x: payload.x, y: payload.y })"
-            @edge-click="(edgeId: string) => { designer.selectedActivityId.value = null; designer.selectedEdgeId.value = edgeId }"
-            @connect-request="onConnectRequest"
-          />
-          <!-- Failure banner is a notification, not content: capped height with
-               internal scroll and a dismiss button so a backend stack trace can
-               never bury the canvas. -->
-          <div
-            v-if="bannerError && !errorBannerDismissed"
-            role="alert"
-            class="absolute inset-x-0 top-0 z-10 border-b border-destructive/40 bg-destructive/10 backdrop-blur-sm"
-          >
-            <button
-              type="button"
-              class="absolute right-2 top-2 rounded p-0.5 text-destructive hover:bg-destructive/20"
-              title="关闭"
-              @click="errorBannerDismissed = true"
-            >
-              <X :size="14" />
-            </button>
-            <div class="max-h-32 overflow-y-auto px-4 py-2 pr-9 text-xs whitespace-pre-wrap break-words text-destructive">
-              {{ bannerError }}
-            </div>
-          </div>
-          <div
-            v-if="designer.lastSavedAt.value"
-            class="absolute bottom-2 right-2 rounded bg-background/90 border px-2 py-1 text-xs text-muted-foreground"
-          >
-            已保存 {{ designer.lastSavedAt.value.toLocaleTimeString() }}
-          </div>
-        </div>
-        <!-- 底部 dock 只占画布列（VS Code/IntelliJ 惯例）：侧栏保持全高，仅画布为它让高度。 -->
-        <ProblemListPanel
-          v-if="!designer.readonly.value"
-          :problems="designer.problems.value"
-          :validating="designer.validating.value"
-          :validation-error="designer.validationError.value"
-          :open="problemPanelOpen"
-          @update:open="(open: boolean) => (problemPanelOpen = open)"
-          @reveal="(problem) => designer.revealActivity(problem)"
-        />
-      </div>
-      <RightToolDock :designer="designer" />
-    </div>
-
-    <PublishDialog :designer="designer" :open="publishOpen" @update:open="(open: boolean) => (publishOpen = open)" />
-
-    <DebugRunDialog
-      :open="debugOpen"
-      :inputs="designer.inputs.value"
-      :running="debugRunning"
-      :error="debugError"
-      @update:open="(open: boolean) => (debugOpen = open)"
-      @confirm="onDebugConfirm"
-    />
-
-    <VersionHistorySheet :designer="designer" :open="historyOpen" @update:open="(open: boolean) => (historyOpen = open)" />
-
-    <DefinitionFormDialog
-      :open="editOpen"
-      :definition="editDefinition"
-      :folder-id="designer.folderId.value"
-      :workspace-id="workspaceId"
-      @update:open="(open: boolean) => (editOpen = open)"
-      @saved="onMetadataSaved"
-    />
-  </div>
-</template>

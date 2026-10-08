@@ -1,18 +1,3 @@
-<script setup lang="ts">
-import { RouterLink } from "vue-router"
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { useBreadcrumbs } from "@/composables/useBreadcrumbs"
-
-const { items } = useBreadcrumbs()
-</script>
-
 <template>
   <Breadcrumb>
     <BreadcrumbList>
@@ -28,3 +13,18 @@ const { items } = useBreadcrumbs()
     </BreadcrumbList>
   </Breadcrumb>
 </template>
+
+<script setup lang="ts">
+import { RouterLink } from "vue-router"
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { useBreadcrumbs } from "@/composables/useBreadcrumbs"
+
+const { items } = useBreadcrumbs()
+</script>

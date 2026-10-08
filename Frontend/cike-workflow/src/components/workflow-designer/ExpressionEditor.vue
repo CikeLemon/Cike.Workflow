@@ -1,3 +1,73 @@
+<template>
+  <div :class="dense ? 'space-y-0.5' : 'space-y-1'">
+    <Label v-if="label" :class="dense ? 'text-[10px]' : 'text-xs'" :title="description ?? undefined">{{ label }}</Label>
+
+    <div class="flex items-start gap-2">
+      <div class="min-w-0 flex-1">
+        <!-- Literal: the caller-provided value editor (only the node knows T). -->
+        <slot v-if="isLiteral(currentType)" :value="currentValue" :commit="commitValue" :readonly="isReadonly" />
+
+        <!-- JavaScript / Liquid: Monaco, committed on blur. -->
+        <MonacoEditor
+          v-else-if="isMonacoType"
+          v-model="draft"
+          :language="languageFor(currentType)"
+          :readonly="isReadonly"
+          @blur="commitDraft"
+        />
+
+        <!-- Variable / WorkflowInput: reference a definition by name. -->
+        <Select
+          v-else-if="isNameType"
+          :model-value="nameValue"
+          :disabled="isReadonly"
+          @update:model-value="(n) => commitValue(String(n))"
+        >
+          <SelectTrigger size="sm" class="w-full text-xs">
+            <SelectValue class="block! min-w-0 truncate" :placeholder="nameOptions.length ? '选择…' : '（暂无可选项）'" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="name in nameOptions" :key="name" :value="name" class="text-xs">{{ name }}</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <!-- Any other string-valued type: plain text fallback. -->
+        <UiInput
+          v-else
+          class="font-mono text-xs"
+          :model-value="draft"
+          :disabled="isReadonly"
+          @input="(e: Event) => (draft = (e.target as HTMLInputElement).value)"
+          @blur="commitDraft"
+        />
+      </div>
+
+      <!-- Type switcher: icon-only trigger opening a single-select picker (ADR 0007). -->
+      <Select
+        v-if="!hideTypeSwitcher"
+        :model-value="currentType"
+        :disabled="isReadonly"
+        @update:model-value="(t) => onTypeChange(String(t))"
+      >
+        <SelectTriggerPrimitive
+          :title="currentTypeName"
+          class="text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0"
+        >
+          <component :is="currentIcon" />
+        </SelectTriggerPrimitive>
+        <SelectContent>
+          <SelectItem v-for="opt in typeOptions" :key="opt.type" :value="opt.type" class="text-xs">
+            <span class="flex items-center gap-2">
+              <component :is="resolveExpressionIcon(opt.icon)" class="size-4 shrink-0 text-muted-foreground" />
+              {{ opt.displayName }}
+            </span>
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { SelectTrigger as SelectTriggerPrimitive } from "reka-ui"
@@ -154,74 +224,3 @@ function onTypeChange(type: string): void {
   )
 }
 </script>
-
-<template>
-  <div :class="dense ? 'space-y-0.5' : 'space-y-1'">
-    <Label v-if="label" :class="dense ? 'text-[10px]' : 'text-xs'" :title="description ?? undefined">{{ label }}</Label>
-
-    <div class="flex items-start gap-2">
-      <div class="min-w-0 flex-1">
-        <!-- Literal: the caller-provided value editor (only the node knows T). -->
-        <slot v-if="isLiteral(currentType)" :value="currentValue" :commit="commitValue" :readonly="isReadonly" />
-
-        <!-- JavaScript / Liquid: Monaco, committed on blur. -->
-        <MonacoEditor
-          v-else-if="isMonacoType"
-          v-model="draft"
-          :language="languageFor(currentType)"
-          :readonly="isReadonly"
-          @blur="commitDraft"
-        />
-
-        <!-- Variable / WorkflowInput: reference a definition by name. -->
-        <Select
-          v-else-if="isNameType"
-          :model-value="nameValue"
-          :disabled="isReadonly"
-          @update:model-value="(n) => commitValue(String(n))"
-        >
-          <SelectTrigger size="sm" class="w-full text-xs">
-            <SelectValue class="block! min-w-0 truncate" :placeholder="nameOptions.length ? '选择…' : '（暂无可选项）'" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem v-for="name in nameOptions" :key="name" :value="name" class="text-xs">{{ name }}</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <!-- Any other string-valued type: plain text fallback. -->
-        <UiInput
-          v-else
-          class="font-mono text-xs"
-          :model-value="draft"
-          :disabled="isReadonly"
-          @input="(e: Event) => (draft = (e.target as HTMLInputElement).value)"
-          @blur="commitDraft"
-        />
-      </div>
-
-      <!-- Type switcher: icon-only trigger opening a single-select picker (ADR 0007). -->
-      <Select
-        v-if="!hideTypeSwitcher"
-        :model-value="currentType"
-        :disabled="isReadonly"
-        @update:model-value="(t) => onTypeChange(String(t))"
-      >
-        <SelectTriggerPrimitive
-          :title="currentTypeName"
-          class="text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0"
-        >
-          <component :is="currentIcon" />
-        </SelectTriggerPrimitive>
-        <SelectContent>
-          <SelectItem v-for="opt in typeOptions" :key="opt.type" :value="opt.type" class="text-xs">
-            <span class="flex items-center gap-2">
-              <component :is="resolveExpressionIcon(opt.icon)" class="size-4 shrink-0 text-muted-foreground" />
-              {{ opt.displayName }}
-            </span>
-          </SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
-</template>
-

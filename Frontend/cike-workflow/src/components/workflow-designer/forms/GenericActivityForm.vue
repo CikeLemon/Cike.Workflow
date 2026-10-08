@@ -1,3 +1,51 @@
+<template>
+  <div class="space-y-3">
+    <div v-for="field in fields" :key="field.field" class="space-y-1">
+      <ExpressionEditor
+        v-if="field.input && !field.readOnly"
+        :expression="field.input.expression"
+        :designer="designer"
+        :label="field.label"
+        :description="field.description"
+        :literal-default="literalDefaultFor(field)"
+      >
+        <template #default="{ value, commit, readonly }">
+          <div v-if="typeof value === 'boolean'" class="flex h-8 items-center">
+            <Switch
+              :model-value="value === true"
+              :disabled="readonly"
+              @update:model-value="(checked: boolean) => commit(checked)"
+            />
+          </div>
+          <UiInput
+            v-else-if="typeof value === 'number'"
+            type="number"
+            :model-value="asText(value)"
+            @change="(event: Event) => commit(coerceNumber((event.target as HTMLInputElement).value))"
+          />
+          <CodeLiteralEditor
+            v-else-if="value != null && typeof value === 'object'"
+            :value="value"
+            :readonly="readonly"
+            @blur="(raw) => { const to = coerceJson(raw); if (to !== undefined) commit(to) }"
+          />
+          <UiInput
+            v-else
+            :model-value="asText(value)"
+            @change="(event: Event) => { const raw = (event.target as HTMLInputElement).value; commit(raw === '' ? null : raw) }"
+          />
+        </template>
+      </ExpressionEditor>
+
+      <template v-else>
+        <Label class="text-xs" :title="field.description ?? undefined">{{ field.label }}</Label>
+        <div v-if="field.readOnly" class="text-xs text-muted-foreground">只读</div>
+        <div v-else class="font-mono text-xs text-muted-foreground">{{ String((activity as unknown as Record<string, unknown>)[field.field] ?? "—") }}</div>
+      </template>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed } from "vue"
 import { Input as UiInput } from "@/components/ui/input"
@@ -48,51 +96,3 @@ function coerceJson(raw: string): unknown {
   }
 }
 </script>
-
-<template>
-  <div class="space-y-3">
-    <div v-for="field in fields" :key="field.field" class="space-y-1">
-      <ExpressionEditor
-        v-if="field.input && !field.readOnly"
-        :expression="field.input.expression"
-        :designer="designer"
-        :label="field.label"
-        :description="field.description"
-        :literal-default="literalDefaultFor(field)"
-      >
-        <template #default="{ value, commit, readonly }">
-          <div v-if="typeof value === 'boolean'" class="flex h-8 items-center">
-            <Switch
-              :model-value="value === true"
-              :disabled="readonly"
-              @update:model-value="(checked: boolean) => commit(checked)"
-            />
-          </div>
-          <UiInput
-            v-else-if="typeof value === 'number'"
-            type="number"
-            :model-value="asText(value)"
-            @change="(event: Event) => commit(coerceNumber((event.target as HTMLInputElement).value))"
-          />
-          <CodeLiteralEditor
-            v-else-if="value != null && typeof value === 'object'"
-            :value="value"
-            :readonly="readonly"
-            @blur="(raw) => { const to = coerceJson(raw); if (to !== undefined) commit(to) }"
-          />
-          <UiInput
-            v-else
-            :model-value="asText(value)"
-            @change="(event: Event) => { const raw = (event.target as HTMLInputElement).value; commit(raw === '' ? null : raw) }"
-          />
-        </template>
-      </ExpressionEditor>
-
-      <template v-else>
-        <Label class="text-xs" :title="field.description ?? undefined">{{ field.label }}</Label>
-        <div v-if="field.readOnly" class="text-xs text-muted-foreground">只读</div>
-        <div v-else class="font-mono text-xs text-muted-foreground">{{ String((activity as unknown as Record<string, unknown>)[field.field] ?? "—") }}</div>
-      </template>
-    </div>
-  </div>
-</template>

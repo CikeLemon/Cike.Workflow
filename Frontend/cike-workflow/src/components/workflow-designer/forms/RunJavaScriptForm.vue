@@ -1,3 +1,27 @@
+<template>
+  <div class="space-y-2">
+    <ExpressionEditor :expression="expr('script')" :designer="designer" label="脚本" :allowed-types="SCRIPT_ALLOWED_TYPES" literal-default="">
+      <template #default="{ value, commit, readonly }">
+        <CodeLiteralEditor
+          language="javascript"
+          :value="value"
+          :readonly="readonly"
+          title="脚本"
+          @blur="(raw) => { const to = coerceLiteralValue(value, raw); if (to !== undefined) commit(to) }"
+        />
+      </template>
+    </ExpressionEditor>
+    <ExpressionEditor :expression="expr('possibleOutcomes')" :designer="designer" label="可能出端口（逗号分隔）" :literal-default="[]">
+      <template #default="{ value, commit }">
+        <UiInput
+          :model-value="outcomesText(value)"
+          @change="(e: Event) => commit(parseOutcomes((e.target as HTMLInputElement).value))"
+        />
+      </template>
+    </ExpressionEditor>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed } from "vue"
 import { Input as UiInput } from "@/components/ui/input"
@@ -28,27 +52,3 @@ function parseOutcomes(raw: string): string[] {
   return raw.split(",").map((entry) => entry.trim()).filter(Boolean)
 }
 </script>
-
-<template>
-  <div class="space-y-2">
-    <ExpressionEditor :expression="expr('script')" :designer="designer" label="脚本" :allowed-types="SCRIPT_ALLOWED_TYPES" literal-default="">
-      <template #default="{ value, commit, readonly }">
-        <CodeLiteralEditor
-          language="javascript"
-          :value="value"
-          :readonly="readonly"
-          title="脚本"
-          @blur="(raw) => { const to = coerceLiteralValue(value, raw); if (to !== undefined) commit(to) }"
-        />
-      </template>
-    </ExpressionEditor>
-    <ExpressionEditor :expression="expr('possibleOutcomes')" :designer="designer" label="可能出端口（逗号分隔）" :literal-default="[]">
-      <template #default="{ value, commit }">
-        <UiInput
-          :model-value="outcomesText(value)"
-          @change="(e: Event) => commit(parseOutcomes((e.target as HTMLInputElement).value))"
-        />
-      </template>
-    </ExpressionEditor>
-  </div>
-</template>

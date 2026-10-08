@@ -1,50 +1,3 @@
-<script setup lang="ts">
-import { computed } from "vue"
-import { ChevronDown, ChevronUp, CircleAlert, CircleCheck, ListChecks, LoaderCircle } from "@lucide/vue"
-import { usePanelResize } from "@/composables/usePanelResize"
-import type { ValidationProblem } from "@/composables/useWorkflowDesigner"
-
-/**
- * Canvas-bottom "problem list" dock — the single outlet for canvas validation
- * problems (ADR 0002). Collapsible IDE-Problems style: the header always shows
- * the problem count / validating / pass state; the body lists each problem and
- * emits `reveal` for locatable rows so the designer can drill to the node.
- */
-const props = defineProps<{
-  problems: ValidationProblem[]
-  validating: boolean
-  validationError: string | null
-  open: boolean
-}>()
-
-const emit = defineEmits<{
-  "update:open": [open: boolean]
-  reveal: [problem: ValidationProblem]
-}>()
-
-const count = computed(() => props.problems.length)
-
-/** 展开态体部高度：顶缘拖拽调整、双击复位，跨会话持久化。 */
-const { size: panelHeight, onPointerDown: onResizeStart, onDoubleClick: onResizeReset } = usePanelResize({
-  axis: "height",
-  invert: true,
-  defaultSize: 200,
-  min: 120,
-  max: 480,
-  maxViewportRatio: 0.5,
-  storageKey: "cike.dock.size.problems",
-})
-
-/** A problem is locatable when it carries a NodeId chain or an activity id. */
-function isLocatable(problem: ValidationProblem): boolean {
-  return Boolean(problem.nodeId || problem.activityId)
-}
-
-function onRowClick(problem: ValidationProblem): void {
-  if (isLocatable(problem)) emit("reveal", problem)
-}
-</script>
-
 <template>
   <div class="relative flex shrink-0 flex-col border-t bg-background">
     <div
@@ -101,3 +54,50 @@ function onRowClick(problem: ValidationProblem): void {
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed } from "vue"
+import { ChevronDown, ChevronUp, CircleAlert, CircleCheck, ListChecks, LoaderCircle } from "@lucide/vue"
+import { usePanelResize } from "@/composables/usePanelResize"
+import type { ValidationProblem } from "@/composables/useWorkflowDesigner"
+
+/**
+ * Canvas-bottom "problem list" dock — the single outlet for canvas validation
+ * problems (ADR 0002). Collapsible IDE-Problems style: the header always shows
+ * the problem count / validating / pass state; the body lists each problem and
+ * emits `reveal` for locatable rows so the designer can drill to the node.
+ */
+const props = defineProps<{
+  problems: ValidationProblem[]
+  validating: boolean
+  validationError: string | null
+  open: boolean
+}>()
+
+const emit = defineEmits<{
+  "update:open": [open: boolean]
+  reveal: [problem: ValidationProblem]
+}>()
+
+const count = computed(() => props.problems.length)
+
+/** 展开态体部高度：顶缘拖拽调整、双击复位，跨会话持久化。 */
+const { size: panelHeight, onPointerDown: onResizeStart, onDoubleClick: onResizeReset } = usePanelResize({
+  axis: "height",
+  invert: true,
+  defaultSize: 200,
+  min: 120,
+  max: 480,
+  maxViewportRatio: 0.5,
+  storageKey: "cike.dock.size.problems",
+})
+
+/** A problem is locatable when it carries a NodeId chain or an activity id. */
+function isLocatable(problem: ValidationProblem): boolean {
+  return Boolean(problem.nodeId || problem.activityId)
+}
+
+function onRowClick(problem: ValidationProblem): void {
+  if (isLocatable(problem)) emit("reveal", problem)
+}
+</script>

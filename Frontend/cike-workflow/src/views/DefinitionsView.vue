@@ -1,240 +1,3 @@
-<script setup lang="ts">
-import { ref, computed, watch } from "vue"
-import { RouterLink, useRoute, useRouter } from "vue-router"
-import { useClipboard } from "@vueuse/core"
-import { Folder, Workflow, Plus, Search, Pencil, Trash2, Move, ChevronRight, Home, Copy, Check } from "@lucide/vue"
-import {
-  getApiV1WorkflowDefinitionsList,
-  getApiV1Folders,
-  deleteApiV1Folders,
-  deleteApiV1WorkflowDefinitionsById,
-} from "@/api"
-import type {
-  WorkflowDefinitionFolderItemDto,
-  WorkflowDefinitionItemDto,
-  FolderDetailDto,
-  FolderPathDto,
-} from "@/api"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import FolderFormDialog from "@/components/FolderFormDialog.vue"
-import DefinitionFormDialog from "@/components/DefinitionFormDialog.vue"
-import MoveDefinitionDialog from "@/components/MoveDefinitionDialog.vue"
-import { extractApiErrorMessage } from "@/lib/apiError"
-
-const ROOT_FOLDER_ID = "0"
-
-const route = useRoute()
-const router = useRouter()
-const workspaceId = route.params.workspaceId as string
-
-// --- 数据层 ---
-const items = ref<WorkflowDefinitionFolderItemDto[]>([])
-const folderDetail = ref<FolderDetailDto | null>(null)
-const loading = ref(false)
-const loadError = ref(false)
-const keyword = ref("")
-
-const currentFolderId = computed(
-  () => (route.query.folderId as string) ?? ROOT_FOLDER_ID,
-)
-
-const isRootFolder = computed(() => currentFolderId.value === ROOT_FOLDER_ID)
-
-// Monotonic sequence guard: rapid folder switches / searches fire overlapping fetchList
-// calls; only the latest may write `items`, so an older folder's late response can't
-// clobber the current folder's list.
-let listFetchSeq = 0
-
-async function fetchList() {
-  const seq = ++listFetchSeq
-  loading.value = true
-  loadError.value = false
-  try {
-    const { data, error } = await getApiV1WorkflowDefinitionsList({
-      query: {
-        workspaceId,
-        folderId: currentFolderId.value,
-        keyword: keyword.value || undefined,
-      },
-    })
-    if (seq !== listFetchSeq) return // stale — a newer fetchList owns the state
-    if (error) {
-      loadError.value = true
-      return
-    }
-    items.value = data ?? []
-  } finally {
-    if (seq === listFetchSeq) loading.value = false
-  }
-}
-
-async function fetchFolderDetail() {
-  if (isRootFolder.value) {
-    folderDetail.value = null
-    return
-  }
-  const { data, error } = await getApiV1Folders({
-    query: { folderId: currentFolderId.value },
-  })
-  if (!error && data) {
-    folderDetail.value = data
-  }
-}
-
-async function refresh() {
-  await Promise.all([fetchList(), fetchFolderDetail()])
-}
-
-// 监听 folderId 变化重新加载
-watch(() => route.query.folderId, refresh, { immediate: true })
-
-function handleSearch() {
-  refresh()
-}
-
-// --- 目录导航 ---
-function navigateToFolder(folderId: string) {
-  router.push({
-    name: "definitions",
-    query: folderId === ROOT_FOLDER_ID ? {} : { folderId },
-  })
-}
-
-// 路径条：根目录 + path segments + 当前目录名
-const pathSegments = computed<FolderPathDto[]>(() => {
-  if (!folderDetail.value) return []
-  return folderDetail.value.path ?? []
-})
-
-// --- 类型映射 ---
-const typeLabels: Record<number, string> = {
-  1: "Workflow",
-  2: "AgentWorkflow",
-  3: "Approval",
-}
-
-function typeBadgeClass(type: number | undefined): string {
-  switch (type) {
-    case 1: return "bg-secondary text-secondary-foreground"
-    case 2: return "bg-info/15 text-info"
-    case 3: return "bg-warning/15 text-warning"
-    default: return "bg-muted text-muted-foreground"
-  }
-}
-
-function getDefinitionData(item: WorkflowDefinitionFolderItemDto): WorkflowDefinitionItemDto | null {
-  if (item.type === 2 && item.data) return item.data as WorkflowDefinitionItemDto
-  return null
-}
-
-// --- 新建/重命名目录 ---
-const folderDialogOpen = ref(false)
-const editingFolder = ref<{ id: string; name: string } | null>(null)
-
-function openCreateFolder() {
-  editingFolder.value = null
-  folderDialogOpen.value = true
-}
-
-function openRenameFolder(item: WorkflowDefinitionFolderItemDto) {
-  const data = item.data as any
-  editingFolder.value = { id: item.id!, name: data?.name ?? "" }
-  folderDialogOpen.value = true
-}
-
-// --- 新建/编辑定义 ---
-const definitionDialogOpen = ref(false)
-const editingDefinition = ref<WorkflowDefinitionFolderItemDto | null>(null)
-
-function openCreateDefinition() {
-  editingDefinition.value = null
-  definitionDialogOpen.value = true
-}
-
-function openEditDefinition(item: WorkflowDefinitionFolderItemDto) {
-  editingDefinition.value = item
-  definitionDialogOpen.value = true
-}
-
-// --- 移动定义 ---
-const moveDialogOpen = ref(false)
-const movingDefinition = ref<WorkflowDefinitionFolderItemDto | null>(null)
-
-function openMoveDefinition(item: WorkflowDefinitionFolderItemDto) {
-  movingDefinition.value = item
-  moveDialogOpen.value = true
-}
-
-// --- 删除确认 ---
-const deleteDialogOpen = ref(false)
-const deletingItem = ref<WorkflowDefinitionFolderItemDto | null>(null)
-const deleting = ref(false)
-const deleteError = ref("")
-
-function openDelete(item: WorkflowDefinitionFolderItemDto) {
-  deletingItem.value = item
-  deleteError.value = ""
-  deleteDialogOpen.value = true
-}
-
-async function confirmDelete() {
-  if (!deletingItem.value) return
-  deleting.value = true
-  deleteError.value = ""
-  try {
-    const isFolder = deletingItem.value.type === 1
-    const { error } = isFolder
-      ? await deleteApiV1Folders({ query: { folderId: deletingItem.value.id! } })
-      : await deleteApiV1WorkflowDefinitionsById({ path: { id: deletingItem.value.id! } })
-    if (error) {
-      deleteError.value = extractApiErrorMessage(error, "删除失败，请稍后重试")
-      return
-    }
-    deleteDialogOpen.value = false
-    deletingItem.value = null
-    refresh()
-  } finally {
-    deleting.value = false
-  }
-}
-
-function getDeleteItemName(item: WorkflowDefinitionFolderItemDto | null): string {
-  if (!item || !item.data || !('name' in item.data)) return ""
-  return (item.data as any).name ?? ""
-}
-
-// --- 复制定义 ID ---
-const { copy } = useClipboard()
-const copiedId = ref("")
-
-async function copyDefinitionId(definitionId: string) {
-  if (!definitionId) return
-  await copy(definitionId)
-  copiedId.value = definitionId
-  setTimeout(() => {
-    if (copiedId.value === definitionId) copiedId.value = ""
-  }, 1500)
-}
-</script>
-
 <template>
   <div class="space-y-4">
     <!-- 路径条（非根目录时显示） -->
@@ -481,3 +244,240 @@ async function copyDefinitionId(definitionId: string) {
     </AlertDialog>
   </div>
 </template>
+
+<script setup lang="ts">
+import { ref, computed, watch } from "vue"
+import { RouterLink, useRoute, useRouter } from "vue-router"
+import { useClipboard } from "@vueuse/core"
+import { Folder, Workflow, Plus, Search, Pencil, Trash2, Move, ChevronRight, Home, Copy, Check } from "@lucide/vue"
+import {
+  getApiV1WorkflowDefinitionsList,
+  getApiV1Folders,
+  deleteApiV1Folders,
+  deleteApiV1WorkflowDefinitionsById,
+} from "@/api"
+import type {
+  WorkflowDefinitionFolderItemDto,
+  WorkflowDefinitionItemDto,
+  FolderDetailDto,
+  FolderPathDto,
+} from "@/api"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import FolderFormDialog from "@/components/FolderFormDialog.vue"
+import DefinitionFormDialog from "@/components/DefinitionFormDialog.vue"
+import MoveDefinitionDialog from "@/components/MoveDefinitionDialog.vue"
+import { extractApiErrorMessage } from "@/lib/apiError"
+
+const ROOT_FOLDER_ID = "0"
+
+const route = useRoute()
+const router = useRouter()
+const workspaceId = route.params.workspaceId as string
+
+// --- 数据层 ---
+const items = ref<WorkflowDefinitionFolderItemDto[]>([])
+const folderDetail = ref<FolderDetailDto | null>(null)
+const loading = ref(false)
+const loadError = ref(false)
+const keyword = ref("")
+
+const currentFolderId = computed(
+  () => (route.query.folderId as string) ?? ROOT_FOLDER_ID,
+)
+
+const isRootFolder = computed(() => currentFolderId.value === ROOT_FOLDER_ID)
+
+// Monotonic sequence guard: rapid folder switches / searches fire overlapping fetchList
+// calls; only the latest may write `items`, so an older folder's late response can't
+// clobber the current folder's list.
+let listFetchSeq = 0
+
+async function fetchList() {
+  const seq = ++listFetchSeq
+  loading.value = true
+  loadError.value = false
+  try {
+    const { data, error } = await getApiV1WorkflowDefinitionsList({
+      query: {
+        workspaceId,
+        folderId: currentFolderId.value,
+        keyword: keyword.value || undefined,
+      },
+    })
+    if (seq !== listFetchSeq) return // stale — a newer fetchList owns the state
+    if (error) {
+      loadError.value = true
+      return
+    }
+    items.value = data ?? []
+  } finally {
+    if (seq === listFetchSeq) loading.value = false
+  }
+}
+
+async function fetchFolderDetail() {
+  if (isRootFolder.value) {
+    folderDetail.value = null
+    return
+  }
+  const { data, error } = await getApiV1Folders({
+    query: { folderId: currentFolderId.value },
+  })
+  if (!error && data) {
+    folderDetail.value = data
+  }
+}
+
+async function refresh() {
+  await Promise.all([fetchList(), fetchFolderDetail()])
+}
+
+// 监听 folderId 变化重新加载
+watch(() => route.query.folderId, refresh, { immediate: true })
+
+function handleSearch() {
+  refresh()
+}
+
+// --- 目录导航 ---
+function navigateToFolder(folderId: string) {
+  router.push({
+    name: "definitions",
+    query: folderId === ROOT_FOLDER_ID ? {} : { folderId },
+  })
+}
+
+// 路径条：根目录 + path segments + 当前目录名
+const pathSegments = computed<FolderPathDto[]>(() => {
+  if (!folderDetail.value) return []
+  return folderDetail.value.path ?? []
+})
+
+// --- 类型映射 ---
+const typeLabels: Record<number, string> = {
+  1: "Workflow",
+  2: "AgentWorkflow",
+  3: "Approval",
+}
+
+function typeBadgeClass(type: number | undefined): string {
+  switch (type) {
+    case 1: return "bg-secondary text-secondary-foreground"
+    case 2: return "bg-info/15 text-info"
+    case 3: return "bg-warning/15 text-warning"
+    default: return "bg-muted text-muted-foreground"
+  }
+}
+
+function getDefinitionData(item: WorkflowDefinitionFolderItemDto): WorkflowDefinitionItemDto | null {
+  if (item.type === 2 && item.data) return item.data as WorkflowDefinitionItemDto
+  return null
+}
+
+// --- 新建/重命名目录 ---
+const folderDialogOpen = ref(false)
+const editingFolder = ref<{ id: string; name: string } | null>(null)
+
+function openCreateFolder() {
+  editingFolder.value = null
+  folderDialogOpen.value = true
+}
+
+function openRenameFolder(item: WorkflowDefinitionFolderItemDto) {
+  const data = item.data as any
+  editingFolder.value = { id: item.id!, name: data?.name ?? "" }
+  folderDialogOpen.value = true
+}
+
+// --- 新建/编辑定义 ---
+const definitionDialogOpen = ref(false)
+const editingDefinition = ref<WorkflowDefinitionFolderItemDto | null>(null)
+
+function openCreateDefinition() {
+  editingDefinition.value = null
+  definitionDialogOpen.value = true
+}
+
+function openEditDefinition(item: WorkflowDefinitionFolderItemDto) {
+  editingDefinition.value = item
+  definitionDialogOpen.value = true
+}
+
+// --- 移动定义 ---
+const moveDialogOpen = ref(false)
+const movingDefinition = ref<WorkflowDefinitionFolderItemDto | null>(null)
+
+function openMoveDefinition(item: WorkflowDefinitionFolderItemDto) {
+  movingDefinition.value = item
+  moveDialogOpen.value = true
+}
+
+// --- 删除确认 ---
+const deleteDialogOpen = ref(false)
+const deletingItem = ref<WorkflowDefinitionFolderItemDto | null>(null)
+const deleting = ref(false)
+const deleteError = ref("")
+
+function openDelete(item: WorkflowDefinitionFolderItemDto) {
+  deletingItem.value = item
+  deleteError.value = ""
+  deleteDialogOpen.value = true
+}
+
+async function confirmDelete() {
+  if (!deletingItem.value) return
+  deleting.value = true
+  deleteError.value = ""
+  try {
+    const isFolder = deletingItem.value.type === 1
+    const { error } = isFolder
+      ? await deleteApiV1Folders({ query: { folderId: deletingItem.value.id! } })
+      : await deleteApiV1WorkflowDefinitionsById({ path: { id: deletingItem.value.id! } })
+    if (error) {
+      deleteError.value = extractApiErrorMessage(error, "删除失败，请稍后重试")
+      return
+    }
+    deleteDialogOpen.value = false
+    deletingItem.value = null
+    refresh()
+  } finally {
+    deleting.value = false
+  }
+}
+
+function getDeleteItemName(item: WorkflowDefinitionFolderItemDto | null): string {
+  if (!item || !item.data || !('name' in item.data)) return ""
+  return (item.data as any).name ?? ""
+}
+
+// --- 复制定义 ID ---
+const { copy } = useClipboard()
+const copiedId = ref("")
+
+async function copyDefinitionId(definitionId: string) {
+  if (!definitionId) return
+  await copy(definitionId)
+  copiedId.value = definitionId
+  setTimeout(() => {
+    if (copiedId.value === definitionId) copiedId.value = ""
+  }, 1500)
+}
+</script>

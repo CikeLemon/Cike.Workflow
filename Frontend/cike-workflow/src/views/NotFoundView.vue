@@ -1,8 +1,3 @@
-<script setup lang="ts">
-import { RouterLink } from "vue-router"
-import { AlertTriangle } from "@lucide/vue"
-</script>
-
 <template>
   <div class="flex flex-col items-center justify-center py-24">
     <AlertTriangle :size="48" class="text-muted-foreground/50" />
@@ -18,3 +13,8 @@ import { AlertTriangle } from "@lucide/vue"
     </RouterLink>
   </div>
 </template>
+
+<script setup lang="ts">
+import { RouterLink } from "vue-router"
+import { AlertTriangle } from "@lucide/vue"
+</script>

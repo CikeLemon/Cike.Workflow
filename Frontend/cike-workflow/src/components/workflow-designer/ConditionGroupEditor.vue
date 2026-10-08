@@ -1,3 +1,111 @@
+<template>
+  <div class="space-y-1">
+    <div class="flex gap-2">
+      <!-- Left rail column: centred junction toggle + vertical rail above/below. -->
+      <div class="flex shrink-0 flex-col items-center">
+        <div class="bg-border w-px flex-1" />
+        <button
+          type="button"
+          :disabled="readonly"
+          :title="group.conditionType === 'and' ? '且（点击切换为或）' : '或（点击切换为且）'"
+          class="text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex h-7 shrink-0 items-center gap-0.5 rounded-md border border-dashed bg-transparent px-1.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-50"
+          @click="toggleJunction"
+        >
+          {{ group.conditionType === "and" ? "且" : "或" }}
+          <ArrowUpDown :size="12" class="shrink-0" />
+        </button>
+        <div class="bg-border w-px flex-1" />
+      </div>
+
+      <div class="min-w-0 flex-1 space-y-1.5">
+        <!-- Flat comparison rows (conditions[]). -->
+        <div v-for="(cmp, index) in conditions" :key="index" class="flex items-start gap-1">
+          <div class="min-w-0 flex-1 space-y-1">
+            <ConditionOperandEditor
+              :operand="cmp.left"
+              :designer="designer"
+              :readonly="readonly"
+              @change="(o) => onLeftChange(index, cmp, o)"
+            />
+            <div class="flex items-center gap-1">
+              <Select
+                :model-value="cmp.operator"
+                :disabled="readonly"
+                @update:model-value="(op) => onOperatorChange(index, cmp, op as ConditionOperator)"
+              >
+                <SelectTriggerPrimitive
+                  :title="OPERATOR_LABELS[cmp.operator]"
+                  class="text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-input bg-transparent outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0"
+                >
+                  <component :is="OPERATOR_ICONS[cmp.operator]" />
+                </SelectTriggerPrimitive>
+                <SelectContent>
+                  <SelectItem v-for="op in operatorsFor(cmp)" :key="op" :value="op" class="text-xs">
+                    <span class="flex items-center gap-2">
+                      <component :is="OPERATOR_ICONS[op]" class="size-4 shrink-0 text-muted-foreground" />
+                      {{ OPERATOR_LABELS[op] }}
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <ConditionOperandEditor
+                v-if="!isUnary(cmp.operator)"
+                class="min-w-0 flex-1"
+                :operand="cmp.right"
+                :designer="designer"
+                :readonly="readonly"
+                @change="(o) => onRightChange(index, cmp, o)"
+              />
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-8 w-8 shrink-0"
+            :disabled="readonly"
+            @click="removeRule(index)"
+          >
+            <Trash2 :size="13" />
+          </Button>
+        </div>
+
+        <!-- Nested subgroup (combineCondition) — recursive, indented, dashed. -->
+        <div v-if="group.combineCondition" class="border-border rounded-md border border-dashed p-2">
+          <div class="mb-1 flex justify-end">
+            <Button variant="ghost" size="icon" class="h-6 w-6" :disabled="readonly" @click="removeCombine">
+              <Trash2 :size="12" />
+            </Button>
+          </div>
+          <ConditionGroupEditor
+            :group="group.combineCondition"
+            :designer="designer"
+            :readonly="readonly"
+            nested
+            @change="(g) => patch({ combineCondition: g })"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Action row aligned to the junction's left edge (image-2). -->
+    <div class="flex items-center gap-1">
+      <Button variant="outline" size="sm" class="h-7 text-xs" :disabled="readonly" @click="addRule">
+        <Plus :size="12" class="mr-1" />添加规则
+      </Button>
+      <Button
+        v-if="!group.combineCondition"
+        variant="outline"
+        size="sm"
+        class="h-7 text-xs"
+        :disabled="readonly"
+        @click="addCombine"
+      >
+        <Plus :size="12" class="mr-1" />组合条件
+      </Button>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed } from "vue"
 import { SelectTrigger as SelectTriggerPrimitive } from "reka-ui"
@@ -145,111 +253,3 @@ function toggleJunction(): void {
   patch({ conditionType: props.group.conditionType === "and" ? "or" : "and" })
 }
 </script>
-
-<template>
-  <div class="space-y-1">
-    <div class="flex gap-2">
-      <!-- Left rail column: centred junction toggle + vertical rail above/below. -->
-      <div class="flex shrink-0 flex-col items-center">
-        <div class="bg-border w-px flex-1" />
-        <button
-          type="button"
-          :disabled="readonly"
-          :title="group.conditionType === 'and' ? '且（点击切换为或）' : '或（点击切换为且）'"
-          class="text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex h-7 shrink-0 items-center gap-0.5 rounded-md border border-dashed bg-transparent px-1.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-50"
-          @click="toggleJunction"
-        >
-          {{ group.conditionType === "and" ? "且" : "或" }}
-          <ArrowUpDown :size="12" class="shrink-0" />
-        </button>
-        <div class="bg-border w-px flex-1" />
-      </div>
-
-      <div class="min-w-0 flex-1 space-y-1.5">
-        <!-- Flat comparison rows (conditions[]). -->
-        <div v-for="(cmp, index) in conditions" :key="index" class="flex items-start gap-1">
-          <div class="min-w-0 flex-1 space-y-1">
-            <ConditionOperandEditor
-              :operand="cmp.left"
-              :designer="designer"
-              :readonly="readonly"
-              @change="(o) => onLeftChange(index, cmp, o)"
-            />
-            <div class="flex items-center gap-1">
-              <Select
-                :model-value="cmp.operator"
-                :disabled="readonly"
-                @update:model-value="(op) => onOperatorChange(index, cmp, op as ConditionOperator)"
-              >
-                <SelectTriggerPrimitive
-                  :title="OPERATOR_LABELS[cmp.operator]"
-                  class="text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-input bg-transparent outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0"
-                >
-                  <component :is="OPERATOR_ICONS[cmp.operator]" />
-                </SelectTriggerPrimitive>
-                <SelectContent>
-                  <SelectItem v-for="op in operatorsFor(cmp)" :key="op" :value="op" class="text-xs">
-                    <span class="flex items-center gap-2">
-                      <component :is="OPERATOR_ICONS[op]" class="size-4 shrink-0 text-muted-foreground" />
-                      {{ OPERATOR_LABELS[op] }}
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <ConditionOperandEditor
-                v-if="!isUnary(cmp.operator)"
-                class="min-w-0 flex-1"
-                :operand="cmp.right"
-                :designer="designer"
-                :readonly="readonly"
-                @change="(o) => onRightChange(index, cmp, o)"
-              />
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="h-8 w-8 shrink-0"
-            :disabled="readonly"
-            @click="removeRule(index)"
-          >
-            <Trash2 :size="13" />
-          </Button>
-        </div>
-
-        <!-- Nested subgroup (combineCondition) — recursive, indented, dashed. -->
-        <div v-if="group.combineCondition" class="border-border rounded-md border border-dashed p-2">
-          <div class="mb-1 flex justify-end">
-            <Button variant="ghost" size="icon" class="h-6 w-6" :disabled="readonly" @click="removeCombine">
-              <Trash2 :size="12" />
-            </Button>
-          </div>
-          <ConditionGroupEditor
-            :group="group.combineCondition"
-            :designer="designer"
-            :readonly="readonly"
-            nested
-            @change="(g) => patch({ combineCondition: g })"
-          />
-        </div>
-      </div>
-    </div>
-
-    <!-- Action row aligned to the junction's left edge (image-2). -->
-    <div class="flex items-center gap-1">
-      <Button variant="outline" size="sm" class="h-7 text-xs" :disabled="readonly" @click="addRule">
-        <Plus :size="12" class="mr-1" />添加规则
-      </Button>
-      <Button
-        v-if="!group.combineCondition"
-        variant="outline"
-        size="sm"
-        class="h-7 text-xs"
-        :disabled="readonly"
-        @click="addCombine"
-      >
-        <Plus :size="12" class="mr-1" />组合条件
-      </Button>
-    </div>
-  </div>
-</template>

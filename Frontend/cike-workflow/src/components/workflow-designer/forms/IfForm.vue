@@ -1,3 +1,13 @@
+<template>
+  <ConditionEditor
+    :spec="spec"
+    :designer="designer"
+    :readonly="designer.readonly.value"
+    label="条件"
+    @change="onChange"
+  />
+</template>
+
 <script setup lang="ts">
 import { computed, watch } from "vue"
 import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
@@ -62,13 +72,3 @@ watch(
   { immediate: true },
 )
 </script>
-
-<template>
-  <ConditionEditor
-    :spec="spec"
-    :designer="designer"
-    :readonly="designer.readonly.value"
-    label="条件"
-    @change="onChange"
-  />
-</template>

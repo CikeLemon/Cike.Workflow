@@ -1,3 +1,81 @@
+<template>
+  <Dialog :open="open" @update:open="emit('update:open', $event)">
+    <DialogContent class="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>移动到...</DialogTitle>
+        <DialogDescription>
+          选择目标目录，将「{{ definition?.data && 'name' in definition.data ? (definition.data as any).name : '' }}」移动到该位置
+        </DialogDescription>
+      </DialogHeader>
+
+      <div class="space-y-3">
+        <!-- 路径条 -->
+        <div class="flex items-center gap-1 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+          <button
+            type="button"
+            class="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            @click="goToRoot"
+          >
+            <Home :size="14" />
+            根目录
+          </button>
+          <template v-for="segment in pickerPath" :key="segment.id">
+            <ChevronRight :size="14" class="text-muted-foreground" />
+            <button
+              type="button"
+              class="text-muted-foreground hover:text-foreground"
+              @click="goToFolder(segment)"
+            >
+              {{ segment.name }}
+            </button>
+          </template>
+          <template v-if="pickerFolderName">
+            <ChevronRight :size="14" class="text-muted-foreground" />
+            <span class="font-medium">{{ pickerFolderName }}</span>
+          </template>
+        </div>
+
+        <!-- 目录列表 -->
+        <div class="min-h-[200px] max-h-[300px] overflow-y-auto rounded-md border">
+          <div v-if="loading" class="flex items-center justify-center py-8 text-sm text-muted-foreground">
+            加载中...
+          </div>
+          <div v-else-if="folders.length === 0" class="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
+            <Folder :size="24" class="mb-2 text-muted-foreground/50" />
+            当前目录下没有子目录
+          </div>
+          <div v-else class="divide-y">
+            <button
+              v-for="folder in folders"
+              :key="folder.id"
+              type="button"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+              @click="enterFolder(folder)"
+            >
+              <Folder :size="16" class="text-warning" />
+              <span>{{ (folder.data as any)?.name ?? '未命名' }}</span>
+              <ChevronRight :size="14" class="ml-auto text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+
+        <p v-if="errorMessage" class="text-sm text-destructive">
+          {{ errorMessage }}
+        </p>
+      </div>
+
+      <DialogFooter>
+        <Button type="button" variant="outline" @click="close">
+          取消
+        </Button>
+        <Button :disabled="moving || !canMoveHere()" @click="handleMove">
+          {{ moving ? '移动中...' : '移动到此处' }}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+</template>
+
 <script setup lang="ts">
 import { ref, watch } from "vue"
 import {
@@ -126,81 +204,3 @@ async function handleMove() {
   }
 }
 </script>
-
-<template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="sm:max-w-lg">
-      <DialogHeader>
-        <DialogTitle>移动到...</DialogTitle>
-        <DialogDescription>
-          选择目标目录，将「{{ definition?.data && 'name' in definition.data ? (definition.data as any).name : '' }}」移动到该位置
-        </DialogDescription>
-      </DialogHeader>
-
-      <div class="space-y-3">
-        <!-- 路径条 -->
-        <div class="flex items-center gap-1 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-          <button
-            type="button"
-            class="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-            @click="goToRoot"
-          >
-            <Home :size="14" />
-            根目录
-          </button>
-          <template v-for="segment in pickerPath" :key="segment.id">
-            <ChevronRight :size="14" class="text-muted-foreground" />
-            <button
-              type="button"
-              class="text-muted-foreground hover:text-foreground"
-              @click="goToFolder(segment)"
-            >
-              {{ segment.name }}
-            </button>
-          </template>
-          <template v-if="pickerFolderName">
-            <ChevronRight :size="14" class="text-muted-foreground" />
-            <span class="font-medium">{{ pickerFolderName }}</span>
-          </template>
-        </div>
-
-        <!-- 目录列表 -->
-        <div class="min-h-[200px] max-h-[300px] overflow-y-auto rounded-md border">
-          <div v-if="loading" class="flex items-center justify-center py-8 text-sm text-muted-foreground">
-            加载中...
-          </div>
-          <div v-else-if="folders.length === 0" class="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
-            <Folder :size="24" class="mb-2 text-muted-foreground/50" />
-            当前目录下没有子目录
-          </div>
-          <div v-else class="divide-y">
-            <button
-              v-for="folder in folders"
-              :key="folder.id"
-              type="button"
-              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
-              @click="enterFolder(folder)"
-            >
-              <Folder :size="16" class="text-warning" />
-              <span>{{ (folder.data as any)?.name ?? '未命名' }}</span>
-              <ChevronRight :size="14" class="ml-auto text-muted-foreground" />
-            </button>
-          </div>
-        </div>
-
-        <p v-if="errorMessage" class="text-sm text-destructive">
-          {{ errorMessage }}
-        </p>
-      </div>
-
-      <DialogFooter>
-        <Button type="button" variant="outline" @click="close">
-          取消
-        </Button>
-        <Button :disabled="moving || !canMoveHere()" @click="handleMove">
-          {{ moving ? '移动中...' : '移动到此处' }}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-</template>

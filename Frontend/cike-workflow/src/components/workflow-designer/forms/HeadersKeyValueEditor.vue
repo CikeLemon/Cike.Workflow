@@ -1,3 +1,30 @@
+<template>
+  <div class="space-y-1.5">
+    <div v-for="(row, index) in rows" :key="index" class="flex items-center gap-1.5">
+      <UiInput
+        class="h-8 w-28 shrink-0 text-xs"
+        :model-value="row.key"
+        placeholder="Header"
+        :disabled="readonly"
+        @change="(event: Event) => updateRow(index, { key: (event.target as HTMLInputElement).value })"
+      />
+      <UiInput
+        class="h-8 min-w-0 flex-1 text-xs"
+        :model-value="row.value"
+        placeholder="值（逗号分隔多值）"
+        :disabled="readonly"
+        @change="(event: Event) => updateRow(index, { value: (event.target as HTMLInputElement).value })"
+      />
+      <Button variant="ghost" size="icon" class="size-8 shrink-0" :disabled="readonly" @click="removeRow(index)">
+        <Trash2 :size="13" />
+      </Button>
+    </div>
+    <Button variant="outline" size="sm" class="w-full" :disabled="readonly" @click="addRow">
+      <Plus :size="13" class="mr-1" />添加请求头
+    </Button>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { ref, watch } from "vue"
 import { Button } from "@/components/ui/button"
@@ -76,30 +103,3 @@ function removeRow(index: number): void {
   commitRows(rows.value.filter((_, i) => i !== index))
 }
 </script>
-
-<template>
-  <div class="space-y-1.5">
-    <div v-for="(row, index) in rows" :key="index" class="flex items-center gap-1.5">
-      <UiInput
-        class="h-8 w-28 shrink-0 text-xs"
-        :model-value="row.key"
-        placeholder="Header"
-        :disabled="readonly"
-        @change="(event: Event) => updateRow(index, { key: (event.target as HTMLInputElement).value })"
-      />
-      <UiInput
-        class="h-8 min-w-0 flex-1 text-xs"
-        :model-value="row.value"
-        placeholder="值（逗号分隔多值）"
-        :disabled="readonly"
-        @change="(event: Event) => updateRow(index, { value: (event.target as HTMLInputElement).value })"
-      />
-      <Button variant="ghost" size="icon" class="size-8 shrink-0" :disabled="readonly" @click="removeRow(index)">
-        <Trash2 :size="13" />
-      </Button>
-    </div>
-    <Button variant="outline" size="sm" class="w-full" :disabled="readonly" @click="addRow">
-      <Plus :size="13" class="mr-1" />添加请求头
-    </Button>
-  </div>
-</template>

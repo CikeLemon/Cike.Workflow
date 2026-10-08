@@ -1,3 +1,55 @@
+<template>
+  <div class="space-y-3">
+    <ExpressionEditor v-if="modeExpr" :expression="modeExpr" :designer="designer" label="匹配模式" :literal-default="0">
+      <template #default="{ value, commit: commitMode }">
+        <Select :model-value="String(value ?? 0)" @update:model-value="(v) => commitMode(Number(String(v)))">
+          <SelectTrigger size="sm" class="w-full text-xs">
+            <SelectValue class="block! min-w-0 truncate" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="0">MatchFirst（首个匹配）</SelectItem>
+            <SelectItem value="1">MatchAny（任一匹配）</SelectItem>
+          </SelectContent>
+        </Select>
+      </template>
+    </ExpressionEditor>
+
+    <div class="space-y-2">
+      <Label class="text-xs">分支（Case）</Label>
+      <div v-for="(entry, index) in caseConditions" :key="index" class="border-border space-y-2 rounded-md border p-2">
+        <div class="flex items-center gap-1.5">
+          <UiInput
+            class="h-8 flex-1 text-xs"
+            :model-value="entry.label"
+            placeholder="分支标签（出端口）"
+            :disabled="designer.readonly.value"
+            @change="(event: Event) => updateLabel(index, (event.target as HTMLInputElement).value)"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-8 w-8 shrink-0"
+            :disabled="designer.readonly.value"
+            @click="removeCase(index)"
+          >
+            <Trash2 :size="13" />
+          </Button>
+        </div>
+        <ConditionEditor
+          :spec="entry"
+          :designer="designer"
+          :readonly="designer.readonly.value"
+          @change="(spec) => updateSpec(index, spec)"
+        />
+      </div>
+      <Button variant="outline" size="sm" class="w-full" :disabled="designer.readonly.value" @click="addCase">
+        <Plus :size="13" class="mr-1" />添加分支
+      </Button>
+      <div class="text-[10px] text-muted-foreground">每个分支标签都会成为该节点的一个出端口</div>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, watch } from "vue"
 import { Input as UiInput } from "@/components/ui/input"
@@ -108,55 +160,3 @@ watch(
   { immediate: true },
 )
 </script>
-
-<template>
-  <div class="space-y-3">
-    <ExpressionEditor v-if="modeExpr" :expression="modeExpr" :designer="designer" label="匹配模式" :literal-default="0">
-      <template #default="{ value, commit: commitMode }">
-        <Select :model-value="String(value ?? 0)" @update:model-value="(v) => commitMode(Number(String(v)))">
-          <SelectTrigger size="sm" class="w-full text-xs">
-            <SelectValue class="block! min-w-0 truncate" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">MatchFirst（首个匹配）</SelectItem>
-            <SelectItem value="1">MatchAny（任一匹配）</SelectItem>
-          </SelectContent>
-        </Select>
-      </template>
-    </ExpressionEditor>
-
-    <div class="space-y-2">
-      <Label class="text-xs">分支（Case）</Label>
-      <div v-for="(entry, index) in caseConditions" :key="index" class="border-border space-y-2 rounded-md border p-2">
-        <div class="flex items-center gap-1.5">
-          <UiInput
-            class="h-8 flex-1 text-xs"
-            :model-value="entry.label"
-            placeholder="分支标签（出端口）"
-            :disabled="designer.readonly.value"
-            @change="(event: Event) => updateLabel(index, (event.target as HTMLInputElement).value)"
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            class="h-8 w-8 shrink-0"
-            :disabled="designer.readonly.value"
-            @click="removeCase(index)"
-          >
-            <Trash2 :size="13" />
-          </Button>
-        </div>
-        <ConditionEditor
-          :spec="entry"
-          :designer="designer"
-          :readonly="designer.readonly.value"
-          @change="(spec) => updateSpec(index, spec)"
-        />
-      </div>
-      <Button variant="outline" size="sm" class="w-full" :disabled="designer.readonly.value" @click="addCase">
-        <Plus :size="13" class="mr-1" />添加分支
-      </Button>
-      <div class="text-[10px] text-muted-foreground">每个分支标签都会成为该节点的一个出端口</div>
-    </div>
-  </div>
-</template>

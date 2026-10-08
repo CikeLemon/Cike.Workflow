@@ -1,50 +1,3 @@
-<script setup lang="ts">
-import { computed, ref, watch } from "vue"
-import { PanelRightClose, PanelRightOpen, Settings2, SquareStack } from "@lucide/vue"
-import { usePanelResize } from "@/composables/usePanelResize"
-import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
-import WorkflowConfigPanel from "./WorkflowConfigPanel.vue"
-import NodePropertyPanel from "./NodePropertyPanel.vue"
-
-/**
- * Right tool dock (ADR 0008): narrow icon rail + single content panel.
- * Switches between "Workflow Config" and "Node Properties" based on selection.
- * Reuses existing pin/resize/persistence mechanisms.
- */
-const props = defineProps<{ designer: WorkflowDesignerState }>()
-
-type DockTab = "config" | "properties"
-
-const activeTab = ref<DockTab>("config")
-const open = ref(true)
-
-/** Auto-switch: selecting a node activates properties; deselecting returns to config. */
-watch(
-  () => props.designer.selectedActivityId.value,
-  (id, prev) => {
-    if (id && id !== prev) {
-      activeTab.value = "properties"
-      // Auto-expand on selection (unless user manually collapsed).
-      open.value = true
-    } else if (!id && prev) {
-      activeTab.value = "config"
-      // Preserve current open/collapsed state on deselect (ADR 0008).
-    }
-  },
-)
-
-const { size: panelWidth, onPointerDown: onResizeStart, onDoubleClick: onResizeReset } = usePanelResize({
-  axis: "width",
-  invert: true,
-  defaultSize: 320,
-  min: 260,
-  max: 520,
-  storageKey: "cike.dock.size.property",
-})
-
-const activity = computed(() => props.designer.selectedActivity.value)
-</script>
-
 <template>
   <div class="flex shrink-0">
     <!-- Content panel -->
@@ -109,3 +62,50 @@ const activity = computed(() => props.designer.selectedActivity.value)
     </nav>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed, ref, watch } from "vue"
+import { PanelRightClose, PanelRightOpen, Settings2, SquareStack } from "@lucide/vue"
+import { usePanelResize } from "@/composables/usePanelResize"
+import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
+import WorkflowConfigPanel from "./WorkflowConfigPanel.vue"
+import NodePropertyPanel from "./NodePropertyPanel.vue"
+
+/**
+ * Right tool dock (ADR 0008): narrow icon rail + single content panel.
+ * Switches between "Workflow Config" and "Node Properties" based on selection.
+ * Reuses existing pin/resize/persistence mechanisms.
+ */
+const props = defineProps<{ designer: WorkflowDesignerState }>()
+
+type DockTab = "config" | "properties"
+
+const activeTab = ref<DockTab>("config")
+const open = ref(true)
+
+/** Auto-switch: selecting a node activates properties; deselecting returns to config. */
+watch(
+  () => props.designer.selectedActivityId.value,
+  (id, prev) => {
+    if (id && id !== prev) {
+      activeTab.value = "properties"
+      // Auto-expand on selection (unless user manually collapsed).
+      open.value = true
+    } else if (!id && prev) {
+      activeTab.value = "config"
+      // Preserve current open/collapsed state on deselect (ADR 0008).
+    }
+  },
+)
+
+const { size: panelWidth, onPointerDown: onResizeStart, onDoubleClick: onResizeReset } = usePanelResize({
+  axis: "width",
+  invert: true,
+  defaultSize: 320,
+  min: 260,
+  max: 520,
+  storageKey: "cike.dock.size.property",
+})
+
+const activity = computed(() => props.designer.selectedActivity.value)
+</script>

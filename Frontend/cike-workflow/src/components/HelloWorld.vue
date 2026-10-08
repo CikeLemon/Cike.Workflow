@@ -1,12 +1,3 @@
-<script setup lang="ts">
-import { ref } from 'vue'
-import heroImg from '../assets/hero.png'
-import viteLogo from '../assets/vite.svg'
-import vueLogo from '../assets/vue.svg'
-
-const count = ref(0)
-</script>
-
 <template>
   <section id="center">
     <div class="hero">
@@ -93,3 +84,12 @@ const count = ref(0)
   <div class="ticks"></div>
   <section id="spacer"></section>
 </template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import heroImg from '../assets/hero.png'
+import viteLogo from '../assets/vite.svg'
+import vueLogo from '../assets/vue.svg'
+
+const count = ref(0)
+</script>

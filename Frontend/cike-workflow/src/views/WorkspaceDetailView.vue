@@ -1,3 +1,29 @@
+<template>
+  <div class="space-y-4">
+    <!-- Workspace Header -->
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">
+        {{ workspace?.name || "空间" }}
+      </h1>
+    </div>
+
+    <!-- Tabs -->
+    <Tabs :model-value="activeTab()">
+      <TabsList>
+        <TabsTrigger value="definitions" @click="$router.push({ name: 'definitions', params: { workspaceId } })">
+          工作流定义
+        </TabsTrigger>
+        <TabsTrigger value="instances" @click="$router.push({ name: 'instances', params: { workspaceId } })">
+          工作流实例
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
+
+    <!-- Tab Content -->
+    <RouterView />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { ref, onMounted } from "vue"
 import { useRoute } from "vue-router"
@@ -27,29 +53,3 @@ function activeTab(): string {
   return "definitions"
 }
 </script>
-
-<template>
-  <div class="space-y-4">
-    <!-- Workspace Header -->
-    <div>
-      <h1 class="text-xl font-semibold tracking-tight">
-        {{ workspace?.name || "空间" }}
-      </h1>
-    </div>
-
-    <!-- Tabs -->
-    <Tabs :model-value="activeTab()">
-      <TabsList>
-        <TabsTrigger value="definitions" @click="$router.push({ name: 'definitions', params: { workspaceId } })">
-          工作流定义
-        </TabsTrigger>
-        <TabsTrigger value="instances" @click="$router.push({ name: 'instances', params: { workspaceId } })">
-          工作流实例
-        </TabsTrigger>
-      </TabsList>
-    </Tabs>
-
-    <!-- Tab Content -->
-    <RouterView />
-  </div>
-</template>

@@ -1,45 +1,3 @@
-<script setup lang="ts">
-import { computed } from "vue"
-import { Input as UiInput } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
-import type { ExpressionLike } from "@/core/designer/expression"
-import { coerceLiteralValue } from "@/core/designer/form"
-import CodeLiteralEditor from "./CodeLiteralEditor.vue"
-import ExpressionEditor from "../ExpressionEditor.vue"
-import HeadersKeyValueEditor from "./HeadersKeyValueEditor.vue"
-import StatusCodeMultiSelect from "./StatusCodeMultiSelect.vue"
-
-/**
- * Single-column, grouped layout (n8n-style side panel): the ~300px dock leaves
- * ~90px per cell in a two-column grid once each row's 32px type-icon trigger
- * is deducted, which truncated the 45-code default error list beyond reading.
- */
-const props = defineProps<{ activity: unknown; designer: WorkflowDesignerState }>()
-
-const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
-
-const activity = computed(() => props.activity as unknown as Record<string, { expression: ExpressionLike }>)
-
-function expr(key: string): ExpressionLike {
-  return activity.value[key].expression
-}
-
-function text(value: unknown): string {
-  return value == null ? "" : typeof value === "object" ? JSON.stringify(value) : String(value)
-}
-
-function codes(value: unknown): number[] {
-  return Array.isArray(value) ? value.filter((entry): entry is number => typeof entry === "number") : []
-}
-
-function commitText(value: unknown, raw: string, commit: (to: unknown) => void): void {
-  const to = coerceLiteralValue(value, raw)
-  if (to !== undefined) commit(to)
-}
-</script>
-
 <template>
   <div class="space-y-3">
     <div class="space-y-2">
@@ -140,3 +98,45 @@ function commitText(value: unknown, raw: string, commit: (to: unknown) => void):
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed } from "vue"
+import { Input as UiInput } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
+import type { ExpressionLike } from "@/core/designer/expression"
+import { coerceLiteralValue } from "@/core/designer/form"
+import CodeLiteralEditor from "./CodeLiteralEditor.vue"
+import ExpressionEditor from "../ExpressionEditor.vue"
+import HeadersKeyValueEditor from "./HeadersKeyValueEditor.vue"
+import StatusCodeMultiSelect from "./StatusCodeMultiSelect.vue"
+
+/**
+ * Single-column, grouped layout (n8n-style side panel): the ~300px dock leaves
+ * ~90px per cell in a two-column grid once each row's 32px type-icon trigger
+ * is deducted, which truncated the 45-code default error list beyond reading.
+ */
+const props = defineProps<{ activity: unknown; designer: WorkflowDesignerState }>()
+
+const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+
+const activity = computed(() => props.activity as unknown as Record<string, { expression: ExpressionLike }>)
+
+function expr(key: string): ExpressionLike {
+  return activity.value[key].expression
+}
+
+function text(value: unknown): string {
+  return value == null ? "" : typeof value === "object" ? JSON.stringify(value) : String(value)
+}
+
+function codes(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((entry): entry is number => typeof entry === "number") : []
+}
+
+function commitText(value: unknown, raw: string, commit: (to: unknown) => void): void {
+  const to = coerceLiteralValue(value, raw)
+  if (to !== undefined) commit(to)
+}
+</script>

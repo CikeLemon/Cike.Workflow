@@ -1,199 +1,3 @@
-<script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue"
-import { RouterLink, useRoute } from "vue-router"
-import { RefreshCw, Inbox, TriangleAlert, ChevronLeft, ChevronRight, ChevronDown, Search, SearchX, X, Check } from "@lucide/vue"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Switch } from "@/components/ui/switch"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { canCancel, useInstancesList } from "@/composables/useInstancesList"
-import type { WorkflowStatus, WorkflowInstanceItemDto } from "@/api/generated"
-
-const route = useRoute()
-const workspaceId = route.params.workspaceId as string
-
-const list = useInstancesList(workspaceId)
-
-// WorkflowStatus is a numeric enum: Pending=0 Executing=1 Suspended=2
-// Finished=3 Cancelled=4 Faulted=5 Interrupted=6.
-const STATUS_CONFIG: Record<number, { label: string; class: string; dot: string }> = {
-  0: { label: "等待中", class: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
-  1: { label: "执行中", class: "bg-info/15 text-info", dot: "bg-info" },
-  2: { label: "已挂起", class: "bg-warning/15 text-warning", dot: "bg-warning" },
-  3: { label: "已完成", class: "bg-success/15 text-success", dot: "bg-success" },
-  4: { label: "已取消", class: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
-  5: { label: "已故障", class: "bg-destructive/15 text-destructive", dot: "bg-destructive" },
-  6: { label: "已中断", class: "bg-warning/15 text-warning", dot: "bg-warning" },
-}
-const STATUS_OPTIONS = (Object.keys(STATUS_CONFIG) as unknown as WorkflowStatus[])
-  .map(Number)
-  .map((v) => ({ value: v as WorkflowStatus, label: STATUS_CONFIG[v]!.label, dot: STATUS_CONFIG[v]!.dot }))
-
-function statusLabel(status?: WorkflowStatus): string {
-  return status != null ? (STATUS_CONFIG[status]?.label ?? String(status)) : "—"
-}
-function statusClass(status?: WorkflowStatus): string {
-  return status != null ? (STATUS_CONFIG[status]?.class ?? "bg-muted text-muted-foreground") : "bg-muted text-muted-foreground"
-}
-
-function formatDateTime(value?: string): string {
-  if (!value) return "—"
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return "—"
-  // .NET DateTime.MinValue (0001-01-01) is the backend sentinel for "not finished".
-  if (d.getFullYear() <= 1) return "—"
-  return d.toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
-}
-
-// Instance name is an optional run label (usually empty); fall back to a short id so
-// every row keeps a meaningful, clickable identity instead of duplicating the definition.
-function instanceLabel(inst: { name?: string; id?: string }): string {
-  if (inst.name) return inst.name
-  return inst.id ? `实例 #${inst.id.slice(-6)}` : "实例"
-}
-
-function isSubWorkflow(parentId?: string): boolean {
-  return !!parentId && parentId !== "0"
-}
-
-// --- search: local buffer, committed on Enter (so typing alone doesn't flip filter state) ---
-const searchInput = ref("")
-function commitSearch(): void {
-  list.searchTerm.value = searchInput.value
-  void list.applyFilters()
-}
-function clearSearch(): void {
-  searchInput.value = ""
-  list.searchTerm.value = ""
-  void list.applyFilters()
-}
-watch(() => list.searchTerm.value, (v) => { searchInput.value = v })
-
-// --- definition combobox ---
-const defOpen = ref(false)
-const selectedDefinitionLabel = computed(() => {
-  const id = list.selectedDefinitionIds.value[0]
-  if (!id) return ""
-  return list.definitionOptions.value.find((o) => o.definitionId === id)?.name ?? id
-})
-function selectDefinition(id: string): void {
-  if (!id) return
-  const current = list.selectedDefinitionIds.value
-  list.setDefinitionFilter(current.includes(id) ? [] : [id])
-  defOpen.value = false
-  void list.applyFilters()
-}
-function clearDefinitionFilter(): void {
-  list.setDefinitionFilter([])
-  defOpen.value = false
-  void list.applyFilters()
-}
-
-// --- status chips (multi-select) ---
-const statusModel = computed<(string | number)[]>({
-  get: () => [...list.selectedStatuses.value],
-  set: (v) => {
-    list.selectedStatuses.value = v as WorkflowStatus[]
-    void list.applyFilters()
-  },
-})
-
-// --- toggles ---
-const hasIncidentsModel = computed({
-  get: () => list.hasIncidents.value,
-  set: (v: boolean) => {
-    list.hasIncidents.value = v
-    void list.applyFilters()
-  },
-})
-const isDebugModel = computed({
-  get: () => list.isDebug.value,
-  set: (v: boolean) => {
-    list.isDebug.value = v
-    void list.applyFilters()
-  },
-})
-
-const pageSizeModel = computed({
-  get: () => String(list.pageSize.value),
-  set: (v: string) => {
-    void list.setPageSize(Number(v))
-  },
-})
-
-// --- row cancel (irreversible → confirm gate; async → refetch, no optimistic flip) ---
-const cancelTarget = ref<WorkflowInstanceItemDto | null>(null)
-// reka's AlertDialogAction dismisses the dialog on click, and that close runs through
-// the cancelOpen setter (nulling cancelTarget) potentially BEFORE our confirm handler
-// runs. So capture the id separately at open time; confirmCancel reads this, never
-// cancelTarget, otherwise the confirm click sees a null id and sends no request.
-const pendingCancelId = ref<string | null>(null)
-const cancelOpen = computed({
-  get: () => cancelTarget.value !== null,
-  set: (v: boolean) => {
-    if (!v) cancelTarget.value = null
-  },
-})
-function askCancel(inst: WorkflowInstanceItemDto): void {
-  cancelTarget.value = inst
-  pendingCancelId.value = inst.id ?? null
-}
-async function confirmCancel(): Promise<void> {
-  const id = pendingCancelId.value
-  pendingCancelId.value = null
-  cancelTarget.value = null
-  if (id) await list.cancel(id)
-}
-
-onMounted(() => {
-  void list.init()
-})
-</script>
-
 <template>
   <div class="space-y-4">
     <!-- Toolbar: search + definition combobox + refresh -->
@@ -520,3 +324,199 @@ onMounted(() => {
     </AlertDialog>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from "vue"
+import { RouterLink, useRoute } from "vue-router"
+import { RefreshCw, Inbox, TriangleAlert, ChevronLeft, ChevronRight, ChevronDown, Search, SearchX, X, Check } from "@lucide/vue"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { canCancel, useInstancesList } from "@/composables/useInstancesList"
+import type { WorkflowStatus, WorkflowInstanceItemDto } from "@/api/generated"
+
+const route = useRoute()
+const workspaceId = route.params.workspaceId as string
+
+const list = useInstancesList(workspaceId)
+
+// WorkflowStatus is a numeric enum: Pending=0 Executing=1 Suspended=2
+// Finished=3 Cancelled=4 Faulted=5 Interrupted=6.
+const STATUS_CONFIG: Record<number, { label: string; class: string; dot: string }> = {
+  0: { label: "等待中", class: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
+  1: { label: "执行中", class: "bg-info/15 text-info", dot: "bg-info" },
+  2: { label: "已挂起", class: "bg-warning/15 text-warning", dot: "bg-warning" },
+  3: { label: "已完成", class: "bg-success/15 text-success", dot: "bg-success" },
+  4: { label: "已取消", class: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
+  5: { label: "已故障", class: "bg-destructive/15 text-destructive", dot: "bg-destructive" },
+  6: { label: "已中断", class: "bg-warning/15 text-warning", dot: "bg-warning" },
+}
+const STATUS_OPTIONS = (Object.keys(STATUS_CONFIG) as unknown as WorkflowStatus[])
+  .map(Number)
+  .map((v) => ({ value: v as WorkflowStatus, label: STATUS_CONFIG[v]!.label, dot: STATUS_CONFIG[v]!.dot }))
+
+function statusLabel(status?: WorkflowStatus): string {
+  return status != null ? (STATUS_CONFIG[status]?.label ?? String(status)) : "—"
+}
+function statusClass(status?: WorkflowStatus): string {
+  return status != null ? (STATUS_CONFIG[status]?.class ?? "bg-muted text-muted-foreground") : "bg-muted text-muted-foreground"
+}
+
+function formatDateTime(value?: string): string {
+  if (!value) return "—"
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return "—"
+  // .NET DateTime.MinValue (0001-01-01) is the backend sentinel for "not finished".
+  if (d.getFullYear() <= 1) return "—"
+  return d.toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+}
+
+// Instance name is an optional run label (usually empty); fall back to a short id so
+// every row keeps a meaningful, clickable identity instead of duplicating the definition.
+function instanceLabel(inst: { name?: string; id?: string }): string {
+  if (inst.name) return inst.name
+  return inst.id ? `实例 #${inst.id.slice(-6)}` : "实例"
+}
+
+function isSubWorkflow(parentId?: string): boolean {
+  return !!parentId && parentId !== "0"
+}
+
+// --- search: local buffer, committed on Enter (so typing alone doesn't flip filter state) ---
+const searchInput = ref("")
+function commitSearch(): void {
+  list.searchTerm.value = searchInput.value
+  void list.applyFilters()
+}
+function clearSearch(): void {
+  searchInput.value = ""
+  list.searchTerm.value = ""
+  void list.applyFilters()
+}
+watch(() => list.searchTerm.value, (v) => { searchInput.value = v })
+
+// --- definition combobox ---
+const defOpen = ref(false)
+const selectedDefinitionLabel = computed(() => {
+  const id = list.selectedDefinitionIds.value[0]
+  if (!id) return ""
+  return list.definitionOptions.value.find((o) => o.definitionId === id)?.name ?? id
+})
+function selectDefinition(id: string): void {
+  if (!id) return
+  const current = list.selectedDefinitionIds.value
+  list.setDefinitionFilter(current.includes(id) ? [] : [id])
+  defOpen.value = false
+  void list.applyFilters()
+}
+function clearDefinitionFilter(): void {
+  list.setDefinitionFilter([])
+  defOpen.value = false
+  void list.applyFilters()
+}
+
+// --- status chips (multi-select) ---
+const statusModel = computed<(string | number)[]>({
+  get: () => [...list.selectedStatuses.value],
+  set: (v) => {
+    list.selectedStatuses.value = v as WorkflowStatus[]
+    void list.applyFilters()
+  },
+})
+
+// --- toggles ---
+const hasIncidentsModel = computed({
+  get: () => list.hasIncidents.value,
+  set: (v: boolean) => {
+    list.hasIncidents.value = v
+    void list.applyFilters()
+  },
+})
+const isDebugModel = computed({
+  get: () => list.isDebug.value,
+  set: (v: boolean) => {
+    list.isDebug.value = v
+    void list.applyFilters()
+  },
+})
+
+const pageSizeModel = computed({
+  get: () => String(list.pageSize.value),
+  set: (v: string) => {
+    void list.setPageSize(Number(v))
+  },
+})
+
+// --- row cancel (irreversible → confirm gate; async → refetch, no optimistic flip) ---
+const cancelTarget = ref<WorkflowInstanceItemDto | null>(null)
+// reka's AlertDialogAction dismisses the dialog on click, and that close runs through
+// the cancelOpen setter (nulling cancelTarget) potentially BEFORE our confirm handler
+// runs. So capture the id separately at open time; confirmCancel reads this, never
+// cancelTarget, otherwise the confirm click sees a null id and sends no request.
+const pendingCancelId = ref<string | null>(null)
+const cancelOpen = computed({
+  get: () => cancelTarget.value !== null,
+  set: (v: boolean) => {
+    if (!v) cancelTarget.value = null
+  },
+})
+function askCancel(inst: WorkflowInstanceItemDto): void {
+  cancelTarget.value = inst
+  pendingCancelId.value = inst.id ?? null
+}
+async function confirmCancel(): Promise<void> {
+  const id = pendingCancelId.value
+  pendingCancelId.value = null
+  cancelTarget.value = null
+  if (id) await list.cancel(id)
+}
+
+onMounted(() => {
+  void list.init()
+})
+</script>

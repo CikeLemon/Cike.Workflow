@@ -1,37 +1,3 @@
-<script setup lang="ts">
-import { ref, watch } from "vue"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
-
-const props = defineProps<{ designer: WorkflowDesignerState; open: boolean }>()
-
-const emit = defineEmits<{ "update:open": [open: boolean] }>()
-
-const note = ref("")
-
-watch(
-  () => props.open,
-  (open) => {
-    if (open) note.value = ""
-  },
-)
-
-async function confirm() {
-  const ok = await props.designer.publish(note.value.trim() || undefined)
-  if (ok) emit("update:open", false)
-}
-</script>
-
 <template>
   <Dialog :open="open" @update:open="(value: boolean) => emit('update:open', value)">
     <DialogContent class="sm:max-w-md">
@@ -67,3 +33,37 @@ async function confirm() {
     </DialogContent>
   </Dialog>
 </template>
+
+<script setup lang="ts">
+import { ref, watch } from "vue"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
+
+const props = defineProps<{ designer: WorkflowDesignerState; open: boolean }>()
+
+const emit = defineEmits<{ "update:open": [open: boolean] }>()
+
+const note = ref("")
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open) note.value = ""
+  },
+)
+
+async function confirm() {
+  const ok = await props.designer.publish(note.value.trim() || undefined)
+  if (ok) emit("update:open", false)
+}
+</script>

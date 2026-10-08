@@ -1,3 +1,68 @@
+<template>
+  <Dialog :open="open" @update:open="emit('update:open', $event)">
+    <DialogContent class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>{{ workspace?.id ? '编辑空间' : '新建空间' }}</DialogTitle>
+        <DialogDescription>
+          {{ workspace?.id ? '修改工作空间的名称和描述' : '创建一个新的工作空间' }}
+        </DialogDescription>
+      </DialogHeader>
+
+      <form @submit="onSubmit" class="space-y-4 min-w-0">
+        <FormField v-slot="{ componentField }" name="code">
+          <FormItem>
+            <FormLabel>编码</FormLabel>
+            <FormControl>
+              <Input
+                placeholder="如 FIN、CRM"
+                :disabled="!!workspace?.id"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormMessage />
+            <p v-if="workspace?.id" class="text-xs text-muted-foreground">
+              编码创建后不可修改
+            </p>
+          </FormItem>
+        </FormField>
+
+        <FormField v-slot="{ componentField }" name="name">
+          <FormItem>
+            <FormLabel>名称</FormLabel>
+            <FormControl>
+              <Input placeholder="如 财务系统" v-bind="componentField" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+
+        <FormField v-slot="{ componentField }" name="description">
+          <FormItem>
+            <FormLabel>描述</FormLabel>
+            <FormControl>
+              <Textarea
+                placeholder="简要描述该空间的用途"
+                rows="3"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" @click="close">
+            取消
+          </Button>
+          <Button type="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? '提交中...' : (workspace?.id ? '保存' : '创建') }}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>
+</template>
+
 <script setup lang="ts">
 import { watch } from "vue"
 import { useForm } from "vee-validate"
@@ -83,68 +148,3 @@ const onSubmit = handleSubmit(async (values) => {
   emit("saved")
 })
 </script>
-
-<template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle>{{ workspace?.id ? '编辑空间' : '新建空间' }}</DialogTitle>
-        <DialogDescription>
-          {{ workspace?.id ? '修改工作空间的名称和描述' : '创建一个新的工作空间' }}
-        </DialogDescription>
-      </DialogHeader>
-
-      <form @submit="onSubmit" class="space-y-4 min-w-0">
-        <FormField v-slot="{ componentField }" name="code">
-          <FormItem>
-            <FormLabel>编码</FormLabel>
-            <FormControl>
-              <Input
-                placeholder="如 FIN、CRM"
-                :disabled="!!workspace?.id"
-                v-bind="componentField"
-              />
-            </FormControl>
-            <FormMessage />
-            <p v-if="workspace?.id" class="text-xs text-muted-foreground">
-              编码创建后不可修改
-            </p>
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ componentField }" name="name">
-          <FormItem>
-            <FormLabel>名称</FormLabel>
-            <FormControl>
-              <Input placeholder="如 财务系统" v-bind="componentField" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ componentField }" name="description">
-          <FormItem>
-            <FormLabel>描述</FormLabel>
-            <FormControl>
-              <Textarea
-                placeholder="简要描述该空间的用途"
-                rows="3"
-                v-bind="componentField"
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" @click="close">
-            取消
-          </Button>
-          <Button type="submit" :disabled="isSubmitting">
-            {{ isSubmitting ? '提交中...' : (workspace?.id ? '保存' : '创建') }}
-          </Button>
-        </DialogFooter>
-      </form>
-    </DialogContent>
-  </Dialog>
-</template>

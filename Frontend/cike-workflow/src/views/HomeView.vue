@@ -1,7 +1,3 @@
-<script setup lang="ts">
-import { LayoutDashboard, Boxes, BookOpen, Sparkles } from "@lucide/vue"
-</script>
-
 <template>
   <div class="space-y-8">
     <!-- Welcome -->
@@ -66,3 +62,7 @@ import { LayoutDashboard, Boxes, BookOpen, Sparkles } from "@lucide/vue"
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { LayoutDashboard, Boxes, BookOpen, Sparkles } from "@lucide/vue"
+</script>

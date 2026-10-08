@@ -1,3 +1,23 @@
+<template>
+  <div class="space-y-2">
+    <ExpressionEditor
+      v-for="item in FIELDS"
+      :key="item.key"
+      :expression="expr(item.key)"
+      :designer="designer"
+      :label="item.label"
+      literal-default=""
+    >
+      <template #default="{ value, commit }">
+        <UiInput
+          :model-value="value == null ? '' : String(value)"
+          @change="(e: Event) => { const raw = (e.target as HTMLInputElement).value; commit(raw === '' ? null : raw) }"
+        />
+      </template>
+    </ExpressionEditor>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed } from "vue"
 import { Input as UiInput } from "@/components/ui/input"
@@ -20,23 +40,3 @@ function expr(key: string): ExpressionLike {
   return activity.value[key].expression
 }
 </script>
-
-<template>
-  <div class="space-y-2">
-    <ExpressionEditor
-      v-for="item in FIELDS"
-      :key="item.key"
-      :expression="expr(item.key)"
-      :designer="designer"
-      :label="item.label"
-      literal-default=""
-    >
-      <template #default="{ value, commit }">
-        <UiInput
-          :model-value="value == null ? '' : String(value)"
-          @change="(e: Event) => { const raw = (e.target as HTMLInputElement).value; commit(raw === '' ? null : raw) }"
-        />
-      </template>
-    </ExpressionEditor>
-  </div>
-</template>

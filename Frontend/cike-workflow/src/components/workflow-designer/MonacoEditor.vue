@@ -1,3 +1,7 @@
+<template>
+  <div ref="container" class="w-full overflow-hidden rounded-md border" :style="{ height }" />
+</template>
+
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue"
 
@@ -124,7 +128,3 @@ watch(
   (ro) => editorRef.value?.updateOptions({ readOnly: ro }),
 )
 </script>
-
-<template>
-  <div ref="container" class="w-full overflow-hidden rounded-md border" :style="{ height }" />
-</template>

@@ -1,73 +1,3 @@
-<script setup lang="ts">
-import { computed, ref } from "vue"
-import { Button } from "@/components/ui/button"
-import { Input as UiInput } from "@/components/ui/input"
-import { ChevronDown, Plus, X } from "@lucide/vue"
-import { DEFAULT_RESPONSE_ERROR_CODES } from "@/core/activities/SendHttpRequest"
-
-/**
- * Compact multi-select for HTTP status-code lists (responseErrorCodes /
- * suspendOnStatusCodes). The default error list has ~45 codes, far too many
- * for a comma-separated input in the narrow property panel, so selection runs
- * through common-code chips plus 4xx/5xx bulk actions; the whole array is
- * handed back in one commit so undo stays one step per edit session.
- */
-const props = withDefaults(defineProps<{ modelValue: number[]; readonly?: boolean }>(), {
-  readonly: false,
-})
-const emit = defineEmits<{ (e: "commit", next: number[]): void }>()
-
-// Three tidy rows of five in the chip grid; anything else selected shows up
-// in the "extra" chip row below.
-const COMMON_CODES = [400, 401, 403, 404, 405, 408, 409, 410, 415, 422, 429, 500, 502, 503, 504]
-
-const selected = computed(() => props.modelValue ?? [])
-const open = ref(false)
-const customRaw = ref("")
-
-const summary = computed(() => {
-  const codes = selected.value
-  if (codes.length === 0) return "未设置"
-  if (codes.length <= 6) return codes.join(", ")
-  return `${codes.length} 个状态码`
-})
-
-const extraCodes = computed(() =>
-  selected.value.filter((code) => !COMMON_CODES.includes(code)).sort((a, b) => a - b),
-)
-
-function commitNext(next: number[]): void {
-  if (props.readonly) return
-  emit("commit", [...new Set(next)].sort((a, b) => a - b))
-}
-
-function toggle(code: number): void {
-  commitNext(
-    selected.value.includes(code) ? selected.value.filter((c) => c !== code) : [...selected.value, code],
-  )
-}
-
-function selectGroup(from: number, to: number): void {
-  const group = DEFAULT_RESPONSE_ERROR_CODES.filter((code) => code >= from && code < to)
-  commitNext([...selected.value, ...group])
-}
-
-function clearAll(): void {
-  commitNext([])
-}
-
-function remove(code: number): void {
-  commitNext(selected.value.filter((c) => c !== code))
-}
-
-function addCustom(): void {
-  const code = Number(customRaw.value)
-  if (!Number.isInteger(code) || code < 100 || code > 599) return
-  if (!selected.value.includes(code)) commitNext([...selected.value, code])
-  customRaw.value = ""
-}
-</script>
-
 <template>
   <div class="space-y-2">
     <Button
@@ -141,3 +71,73 @@ function addCustom(): void {
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed, ref } from "vue"
+import { Button } from "@/components/ui/button"
+import { Input as UiInput } from "@/components/ui/input"
+import { ChevronDown, Plus, X } from "@lucide/vue"
+import { DEFAULT_RESPONSE_ERROR_CODES } from "@/core/activities/SendHttpRequest"
+
+/**
+ * Compact multi-select for HTTP status-code lists (responseErrorCodes /
+ * suspendOnStatusCodes). The default error list has ~45 codes, far too many
+ * for a comma-separated input in the narrow property panel, so selection runs
+ * through common-code chips plus 4xx/5xx bulk actions; the whole array is
+ * handed back in one commit so undo stays one step per edit session.
+ */
+const props = withDefaults(defineProps<{ modelValue: number[]; readonly?: boolean }>(), {
+  readonly: false,
+})
+const emit = defineEmits<{ (e: "commit", next: number[]): void }>()
+
+// Three tidy rows of five in the chip grid; anything else selected shows up
+// in the "extra" chip row below.
+const COMMON_CODES = [400, 401, 403, 404, 405, 408, 409, 410, 415, 422, 429, 500, 502, 503, 504]
+
+const selected = computed(() => props.modelValue ?? [])
+const open = ref(false)
+const customRaw = ref("")
+
+const summary = computed(() => {
+  const codes = selected.value
+  if (codes.length === 0) return "未设置"
+  if (codes.length <= 6) return codes.join(", ")
+  return `${codes.length} 个状态码`
+})
+
+const extraCodes = computed(() =>
+  selected.value.filter((code) => !COMMON_CODES.includes(code)).sort((a, b) => a - b),
+)
+
+function commitNext(next: number[]): void {
+  if (props.readonly) return
+  emit("commit", [...new Set(next)].sort((a, b) => a - b))
+}
+
+function toggle(code: number): void {
+  commitNext(
+    selected.value.includes(code) ? selected.value.filter((c) => c !== code) : [...selected.value, code],
+  )
+}
+
+function selectGroup(from: number, to: number): void {
+  const group = DEFAULT_RESPONSE_ERROR_CODES.filter((code) => code >= from && code < to)
+  commitNext([...selected.value, ...group])
+}
+
+function clearAll(): void {
+  commitNext([])
+}
+
+function remove(code: number): void {
+  commitNext(selected.value.filter((c) => c !== code))
+}
+
+function addCustom(): void {
+  const code = Number(customRaw.value)
+  if (!Number.isInteger(code) || code < 100 || code > 599) return
+  if (!selected.value.includes(code)) commitNext([...selected.value, code])
+  customRaw.value = ""
+}
+</script>
