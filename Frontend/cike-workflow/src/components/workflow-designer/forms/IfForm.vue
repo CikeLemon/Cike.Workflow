@@ -63,7 +63,7 @@ watch(
     const activity = act.value
     const container = containerOf(activity)
     if (!container?.ifCondition) return
-    const compiled = compileCondition(container.ifCondition)
+    const compiled = compileCondition(container.ifCondition, props.designer.variables.value, props.designer.inputs.value)
     const target = activity.condition.expression
     if (target.type !== compiled.type || target.value !== compiled.value) {
       makeSetExpressionCommand(target, compiled).apply()

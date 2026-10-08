@@ -25,6 +25,7 @@
               :operand="cmp.left"
               :designer="designer"
               :readonly="readonly"
+              :locked-data-type="rowRefTypes[index]"
               @change="(o) => onLeftChange(index, cmp, o)"
             />
             <div class="flex items-center gap-1">
@@ -40,7 +41,7 @@
                   <component :is="OPERATOR_ICONS[cmp.operator]" />
                 </SelectTriggerPrimitive>
                 <SelectContent>
-                  <SelectItem v-for="op in operatorsFor(cmp)" :key="op" :value="op" class="text-xs">
+                  <SelectItem v-for="op in rowOperators[index]" :key="op" :value="op" class="text-xs">
                     <span class="flex items-center gap-2">
                       <component :is="OPERATOR_ICONS[op]" class="size-4 shrink-0 text-muted-foreground" />
                       {{ OPERATOR_LABELS[op] }}
@@ -54,6 +55,7 @@
                 :operand="cmp.right"
                 :designer="designer"
                 :readonly="readonly"
+                :locked-data-type="rowRefTypes[index]"
                 @change="(o) => onRightChange(index, cmp, o)"
               />
             </div>
@@ -132,6 +134,7 @@ import {
 import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
 import {
   OPERATORS_BY_DATATYPE,
+  referenceDataTypeOf,
   type ConditionComparison,
   type ConditionDataType,
   type ConditionGroup,
@@ -191,11 +194,20 @@ const OPERATOR_ICONS: Record<ConditionOperator, LucideIcon> = {
   notEmpty: CircleDot,
 }
 
-/** The comparison's effective dataType: right literal → left literal → string (ADR 0010). */
+/** The comparison's effective dataType: referenced definition type (left then
+ *  right) → right literal → left literal → string (ADR 0010). */
 function dataTypeOf(cmp: ConditionComparison): ConditionDataType {
-  if (cmp.right?.type === "Literal" && cmp.right.dataType) return cmp.right.dataType
-  if (cmp.left?.type === "Literal" && cmp.left.dataType) return cmp.left.dataType
-  return "string"
+  return (
+    referenceTypeOf(cmp.left) ??
+    referenceTypeOf(cmp.right) ??
+    (cmp.right?.type === "Literal" ? cmp.right.dataType : undefined) ??
+    (cmp.left?.type === "Literal" ? cmp.left.dataType : undefined) ??
+    "string"
+  )
+}
+
+function referenceTypeOf(operand: ConditionOperand | undefined): ConditionDataType | undefined {
+  return referenceDataTypeOf(operand, props.designer.variables.value, props.designer.inputs.value)
 }
 
 function operatorsFor(cmp: ConditionComparison): ConditionOperator[] {
@@ -247,7 +259,27 @@ function removeCombine(): void {
   patch({ combineCondition: undefined })
 }
 
-const conditions = computed(() => props.group.conditions ?? [])
+// The builder tree is plain (non-reactive) objects and ExpressionEditor owns
+// name/type edits through its own commands, so every model mutation only
+// surfaces through the designer revision. Each derived list reads revision
+// DIRECTLY: a shared computed returning the same array reference would not
+// invalidate its dependents (Vue compares computed values by identity), which
+// would leave operator sets stale after name/type edits (ADR 0010).
+const conditions = computed(() => {
+  void props.designer.revision.value
+  return [...(props.group.conditions ?? [])]
+})
+
+/** Per-row referenced definition type; pins Literal operands when present. */
+const rowRefTypes = computed(() => {
+  void props.designer.revision.value
+  return (props.group.conditions ?? []).map((cmp) => referenceTypeOf(cmp.left) ?? referenceTypeOf(cmp.right))
+})
+
+const rowOperators = computed(() => {
+  void props.designer.revision.value
+  return (props.group.conditions ?? []).map((cmp) => operatorsFor(cmp))
+})
 
 function toggleJunction(): void {
   patch({ conditionType: props.group.conditionType === "and" ? "or" : "and" })

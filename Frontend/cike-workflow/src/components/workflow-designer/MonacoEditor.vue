@@ -17,15 +17,21 @@ const props = withDefaults(
     language?: string
     readonly?: boolean
     height?: string
+    wordWrap?: boolean
   }>(),
   {
     language: "plaintext",
     readonly: false,
     height: "120px",
+    wordWrap: false,
   },
 )
 
-const emit = defineEmits<{ (e: "update:modelValue", value: string): void; (e: "blur"): void }>()
+const emit = defineEmits<{
+  (e: "update:modelValue", value: string): void
+  (e: "blur"): void
+  (e: "ready", editor: import("monaco-editor").editor.IStandaloneCodeEditor): void
+}>()
 
 const container = ref<HTMLDivElement | null>(null)
 const monacoRef = shallowRef<typeof import("monaco-editor") | null>(null)
@@ -63,6 +69,7 @@ async function setup(): Promise<void> {
     language: props.language,
     theme: currentTheme(),
     readOnly: props.readonly,
+    wordWrap: props.wordWrap ? "on" : "off",
     automaticLayout: true,
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
@@ -84,6 +91,7 @@ async function setup(): Promise<void> {
   editor.onDidBlurEditorText(() => emit("blur"))
   monacoRef.value = monaco
   editorRef.value = editor
+  emit("ready", editor)
   // Follow the app light/dark theme live.
   observer = new MutationObserver(() => monaco.editor.setTheme(currentTheme()))
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
@@ -126,5 +134,10 @@ watch(
 watch(
   () => props.readonly,
   (ro) => editorRef.value?.updateOptions({ readOnly: ro }),
+)
+
+watch(
+  () => props.wordWrap,
+  (wrap) => editorRef.value?.updateOptions({ wordWrap: wrap ? "on" : "off" }),
 )
 </script>

@@ -113,7 +113,12 @@ function onTypeChange(target: ConditionSpec["type"]): void {
     value = current.type === "Literal" ? current.value === true : false
   } else if (target === "Javascript") {
     // Leaving the builder compiles the tree to code so semantics survive the switch.
-    value = current.type === "custom" ? compileGroup(current.value as ConditionGroup) : typeof current.value === "string" ? current.value : ""
+    value =
+      current.type === "custom"
+        ? compileGroup(current.value as ConditionGroup, props.designer.variables.value, props.designer.inputs.value)
+        : typeof current.value === "string"
+          ? current.value
+          : ""
   } else {
     value = typeof current.value === "string" ? current.value : ""
   }

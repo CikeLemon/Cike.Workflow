@@ -21,6 +21,9 @@ const props = defineProps<{
   /** Edge whose insert menu is open: its button stays visible while pinned.
    *  Optional — read-only canvases (instance debug) never pass it. */
   insertMenuEdgeId?: string | null
+  /** Selected edge: drives the highlight from parent state so it survives
+   *  full projection re-renders. Optional — instance debug never selects. */
+  selectedEdgeId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -37,7 +40,6 @@ const emit = defineEmits<{
 
 const containerRef = ref<HTMLDivElement>()
 let graph: Graph | null = null
-let selectedEdgeId: string | null = null
 /** Positions captured on node:mousedown for move-command undo. */
 const dragOrigins = new Map<string, { x: number; y: number } | null>()
 /** Sizes captured on node:resize:start for resize-command undo. */
@@ -50,25 +52,23 @@ function onDrop(event: DragEvent): void {
   emit("dropActivity", { typeName, x: point.x, y: point.y })
 }
 
-function setEdgeHighlight(edge: { setAttrByPath?: (path: string, value: unknown) => void } | null, width: number): void {
-  edge?.setAttrByPath?.("line/strokeWidth", width)
+/** Selection look for exactly one edge: primary color (the CSS class flips
+ *  the currentColor the stroke inherits) plus a thicker line. Idempotent, so
+ *  it can be re-applied after every full projection re-render. */
+function paintEdgeSelection(edgeId: string | null): void {
+  if (!graph) return
+  for (const edge of graph.getEdges()) {
+    const selected = String(edge.id) === edgeId
+    graph.findViewByCell(edge)?.container.classList.toggle("edge-selected", selected)
+    edge.setAttrByPath("line/strokeWidth", selected ? 2.5 : 1.5)
+  }
 }
 
 function selectEdge(edgeId: string): void {
-  if (selectedEdgeId === edgeId) return
-  const previous = selectedEdgeId ? graph?.getCellById(selectedEdgeId) : null
-  setEdgeHighlight(previous as never, 1.5)
-  selectedEdgeId = edgeId
-  const current = graph?.getCellById(edgeId)
-  setEdgeHighlight(current as never, 3)
+  if (props.selectedEdgeId === edgeId) return
+  // Paint now for instant feedback; the selectedEdgeId watch reconciles.
+  paintEdgeSelection(edgeId)
   emit("edgeClick", edgeId)
-}
-
-function clearEdgeSelection(): void {
-  if (!selectedEdgeId) return
-  const previous = graph?.getCellById(selectedEdgeId)
-  setEdgeHighlight(previous as never, 1.5)
-  selectedEdgeId = null
 }
 
 /** Edge-insert button (ADR 0013): a hover affordance at the edge midpoint.
@@ -148,7 +148,7 @@ onMounted(() => {
       allowMulti: "withPort",
       highlight: true,
       connectionPoint: "boundary",
-      connector: { name: "rounded", args: { radius: 8 } },
+      connector: { name: "smooth" },
       validateConnection: ({ sourceCell, targetCell, targetPort }) => {
         if (!sourceCell || !targetCell || sourceCell === targetCell) return false
         const target = props.projection.nodes.find((node) => node.id === String(targetCell.id))
@@ -167,7 +167,7 @@ onMounted(() => {
   }
   graph.on("node:click", ({ node }) => emit("nodeClick", String(node.id)))
   graph.on("blank:click", () => {
-    clearEdgeSelection()
+    paintEdgeSelection(null)
     emit("nodeClick", "")
   })
   graph.on("edge:click", ({ edge }) => selectEdge(String(edge.id)))
@@ -244,6 +244,7 @@ watch(() => props.insertMenuEdgeId, (edgeId, previous) => {
 
 watch(() => props.projection, renderProjection)
 watch(() => props.selectedId, renderProjection)
+watch(() => props.selectedEdgeId, (edgeId) => paintEdgeSelection(edgeId ?? null))
 watch(() => props.entryKey, () => applyViewport())
 
 onBeforeUnmount(() => {
@@ -307,7 +308,7 @@ function renderProjection(): void {
       zIndex: 0,
       source: edge.sourcePort ? { cell: edge.source, port: edge.sourcePort } : { cell: edge.source },
       target: targetInPort ? { cell: edge.target, port: targetInPort } : { cell: edge.target },
-      connector: { name: "rounded", args: { radius: 8 } },
+      connector: { name: "smooth" },
       attrs: {
         line: {
           stroke: "currentColor",
@@ -319,6 +320,8 @@ function renderProjection(): void {
     })
   }
   graph.fromJSON({ cells })
+  // fromJSON rebuilds every view, wiping classes/attrs: re-apply selection.
+  paintEdgeSelection(props.selectedEdgeId ?? null)
 }
 
 function removeCellById(cellId: string): void {
@@ -337,6 +340,11 @@ defineExpose({ viewportCenter, removeCellById })
 }
 .canvas-surface :deep(.x6-edge) {
   color: var(--muted-foreground);
+}
+/* Selected edge: the stroke inherits currentColor, so flipping color here
+   turns the line primary in both themes without hardcoding hex values. */
+.canvas-surface :deep(.x6-edge.edge-selected) {
+  color: var(--primary);
 }
 .canvas-surface :deep(.x6-port-body circle) {
   stroke: var(--muted-foreground);

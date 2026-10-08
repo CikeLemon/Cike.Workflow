@@ -71,6 +71,7 @@
             :projection="designer.projection.value"
             :interactive="!designer.readonly.value"
             :selected-id="designer.selectedActivityId.value"
+            :selected-edge-id="designer.selectedEdgeId.value"
             :entry-key="entryKey"
             :entry-activity="designer.currentEntry.value?.activity ?? null"
             @node-click="(id: string) => { designer.selectedActivityId.value = id || null; designer.selectedEdgeId.value = null }"
