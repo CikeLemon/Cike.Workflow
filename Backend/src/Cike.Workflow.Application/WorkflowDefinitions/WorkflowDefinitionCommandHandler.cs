@@ -75,8 +75,6 @@ public class WorkflowDefinitionCommandHandler(
 
         var data = activitySerializer.Serialize(command.Dto.Root);
 
-        await using var handle = await AcquireDefinitionLockAsync(entity.DefinitionId, cancellationToken);
-
         var latest = await GetLatestAsync(entity.DefinitionId, cancellationToken);
 
         // 保存不被调试运行拦截（前端流程是"改 → 存 → 调"）；保存顶掉行 UpdatedAt，
@@ -92,8 +90,6 @@ public class WorkflowDefinitionCommandHandler(
 
         if (entity.IsSystem)
             throw new UserFriendlyException("系统内置工作流不允许删除。");
-
-        await using var handle = await AcquireDefinitionLockAsync(entity.DefinitionId, cancellationToken);
 
         // 删除禁令：定义下存在任何未终态实例（含调试实例）时不允许删除
         await debugRunGuard.EnsureNoRunningInstanceAsync(entity.DefinitionId, cancellationToken);
@@ -118,8 +114,6 @@ public class WorkflowDefinitionCommandHandler(
         var errors = workflowValidator.Validate(new WorkflowValidationContext(command.Root, variables));
         if (errors.Count > 0)
             throw new UserFriendlyException(string.Join("；", errors.Select(x => x.Message)));
-
-        await using var handle = await AcquireDefinitionLockAsync(entity.DefinitionId, cancellationToken);
 
         var latest = await GetLatestAsync(entity.DefinitionId, cancellationToken);
 
@@ -168,8 +162,6 @@ public class WorkflowDefinitionCommandHandler(
         if (target.IsReadonly)
             throw new UserFriendlyException("只读工作流不允许回滚。");
 
-        await using var handle = await AcquireDefinitionLockAsync(target.DefinitionId, cancellationToken);
-
         var latest = await GetLatestAsync(target.DefinitionId, cancellationToken);
 
         if (latest.Id == target.Id)
@@ -211,10 +203,6 @@ public class WorkflowDefinitionCommandHandler(
         return await workflowDefinitionRepository.FindAsync(id, cancellationToken)
             ?? throw new UserFriendlyException("工作流定义不存在，请检查后重试。");
     }
-
-    /// <summary>定义级短锁：串行化"检查调试状态 → 变更内容"的临界区（统一获取口见 WorkflowDefinitionLockExtensions）。</summary>
-    private Task<IAsyncDisposable> AcquireDefinitionLockAsync(string definitionId, CancellationToken cancellationToken = default)
-        => lockService.AcquireAsync(definitionId, cancellationToken);
 
     /// <summary>
     /// 草稿落库（保存与发布共用）：最新行未发布时就地覆盖内容（版本号、IsLatest、IsPublished 不变）；

@@ -21,19 +21,15 @@ internal class WorkflowInstanceCommandHandler(
 
         command.WorkflowInstanceId = identityGenerator.NextId();
 
-        // 定义级短锁：与保存/回滚/发布互斥，避免"草稿校验通过 → 内容被并发抽换"的窗口
-        await using (await lockService.AcquireAsync(row.DefinitionId, cancellationToken))
-        {
-            // 锁内复查：草稿状态以持锁后读到的为准
-            row = await GetDraftRowAsync(command.DefinitionVersionId, cancellationToken);
+        // 锁内复查：草稿状态以持锁后读到的为准
+        row = await GetDraftRowAsync(command.DefinitionVersionId, cancellationToken);
 
-            await workflowDispatcher.DispatchAsync(new DispatchWorkflowDefinitionRequest(command.DefinitionVersionId)
-            {
-                InstanceId = command.WorkflowInstanceId,
-                Input = command.Input ?? new Dictionary<string, object>(),
-                IsDebug = true,
-            }, new DispatchWorkflowOptions(), cancellationToken: cancellationToken);
-        }
+        await workflowDispatcher.DispatchAsync(new DispatchWorkflowDefinitionRequest(command.DefinitionVersionId)
+        {
+            InstanceId = command.WorkflowInstanceId,
+            Input = command.Input ?? new Dictionary<string, object>(),
+            IsDebug = true,
+        }, new DispatchWorkflowOptions(), cancellationToken: cancellationToken);
     }
 
     [LocalEventHandler]
