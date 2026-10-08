@@ -334,12 +334,41 @@ export function useWorkflowDesigner() {
     executeCommand(makeResizeNodeCommand(activity as IActivity, payload.from, { width: payload.width, height: payload.height }))
   }
 
-  /** Builds the delete command; the UI confirms before executing it. */
+  /**
+   * Builds the delete command; the UI confirms before executing it.
+   * Deleting a single-in single-out middle node A→N→B rewires to A→B (keeping
+   * A's source port) as ONE undo step — the exact inverse of edge insertion
+   * (ADR 0013). Any other topology (branch / multi-in / multi-out, a self-loop,
+   * or an already-present A→B) strips the connections instead and lets canvas
+   * validation surface the gap, mirroring 0013's "never guess intent" stance.
+   */
   function buildRemoveCommand(activityId: string): DesignerCommand | null {
     const entry = currentEntry.value
     if (!entry) return null
-    const container = entry.activity as unknown as { activities: IActivity[]; connections?: unknown[] }
-    return makeRemoveNodeCommand(container as never, activityId)
+    const container = entry.activity as unknown as { activities: IActivity[]; connections?: ActivityConnection[] }
+    const removeCommand = makeRemoveNodeCommand(container as never, activityId)
+    if (!removeCommand) return null
+    const connections = container.connections ?? []
+    const inEdges = connections.filter((connection) => connection.target.activityId === activityId)
+    const outEdges = connections.filter((connection) => connection.source.activityId === activityId)
+    if (inEdges.length !== 1 || outEdges.length !== 1) return removeCommand
+    const sourceId = inEdges[0].source.activityId
+    const sourcePort = inEdges[0].source.port
+    const targetId = outEdges[0].target.activityId
+    const alreadyConnected = connections.some(
+      (connection) =>
+        connection.source.activityId === sourceId &&
+        (connection.source.port ?? undefined) === (sourcePort ?? undefined) &&
+        connection.target.activityId === targetId,
+    )
+    if (sourceId === targetId || alreadyConnected) return removeCommand
+    return makeBatchCommand("删除节点", [
+      removeCommand,
+      makeConnectCommand(
+        container as never,
+        new ActivityConnection(new ActivityEndpoint(sourceId, sourcePort), new ActivityEndpoint(targetId)),
+      ),
+    ])
   }
 
   function removeNode(activityId: string): void {

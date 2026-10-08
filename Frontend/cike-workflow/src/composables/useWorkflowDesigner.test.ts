@@ -993,3 +993,135 @@ describe("useWorkflowDesigner edge insertion", () => {
     expect(designer.insertNodeOnConnection({ source: "s1", target: "e1" }, "Cike.RunJavaScript")).toBe(false)
   })
 })
+
+describe("useWorkflowDesigner node removal rewire", () => {
+  function mockFlow(activities: unknown[], connections: unknown[]) {
+    getById.mockResolvedValue({
+      data: {
+        ...makeDetail(),
+        root: { type: "Cike.Flowchart", id: "fc-root", name: "示例流程", activities, connections },
+      },
+      error: undefined,
+    })
+  }
+
+  function connectionsOf(designer: ReturnType<typeof useWorkflowDesigner>) {
+    const entry = designer.currentEntry.value!.activity as unknown as {
+      connections: { source: { activityId: string; port?: string }; target: { activityId: string } }[]
+    }
+    return entry.connections.map((c) => `${c.source.activityId}${c.source.port ? `.${c.source.port}` : ""}->${c.target.activityId}`)
+  }
+
+  function idsOf(designer: ReturnType<typeof useWorkflowDesigner>) {
+    return designer.currentChildren.value.map((activity) => activity.id)
+  }
+
+  const linearActivities = [
+    { type: "Cike.Start", id: "a-start" },
+    { type: "Cike.RunJavaScript", id: "a-mid" },
+    { type: "Cike.End", id: "a-end" },
+  ]
+  const linearConnections = [
+    { source: { activityId: "a-start" }, target: { activityId: "a-mid" } },
+    { source: { activityId: "a-mid", port: "Done" }, target: { activityId: "a-end" } },
+  ]
+
+  it("Remove_SingleInSingleOut_RewiresAndDropsDeletedOutPort", async () => {
+    mockFlow(linearActivities, linearConnections)
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    designer.removeNode("a-mid")
+
+    expect(idsOf(designer)).not.toContain("a-mid")
+    // Rewire keeps the inbound source (a-start, no port); the deleted node's own
+    // out port (Done) is dropped — the exact inverse of insertion (ADR 0013).
+    expect(connectionsOf(designer)).toEqual(["a-start->a-end"])
+  })
+
+  it("Remove_SingleInSingleOut_PreservesInboundSourcePort", async () => {
+    mockFlow(
+      [
+        { type: "Cike.Start", id: "a-start" },
+        { type: "Cike.If", id: "a-if" },
+        { type: "Cike.RunJavaScript", id: "a-mid" },
+        { type: "Cike.End", id: "a-end" },
+      ],
+      [
+        { source: { activityId: "a-start" }, target: { activityId: "a-if" } },
+        { source: { activityId: "a-if", port: "True" }, target: { activityId: "a-mid" } },
+        { source: { activityId: "a-mid", port: "Done" }, target: { activityId: "a-end" } },
+      ],
+    )
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    designer.removeNode("a-mid")
+
+    // The inbound branch port (If.True) survives; only a-mid's own port is lost.
+    expect(connectionsOf(designer).sort()).toEqual(["a-start->a-if", "a-if.True->a-end"].sort())
+  })
+
+  it("Remove_MultiOut_StripsAllConnections_NoRewire", async () => {
+    mockFlow(
+      [
+        { type: "Cike.Start", id: "a-start" },
+        { type: "Cike.If", id: "a-if" },
+        { type: "Cike.End", id: "a-end1" },
+        { type: "Cike.End", id: "a-end2" },
+      ],
+      [
+        { source: { activityId: "a-start" }, target: { activityId: "a-if" } },
+        { source: { activityId: "a-if", port: "True" }, target: { activityId: "a-end1" } },
+        { source: { activityId: "a-if", port: "False" }, target: { activityId: "a-end2" } },
+      ],
+    )
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    designer.removeNode("a-if")
+
+    expect(idsOf(designer)).not.toContain("a-if")
+    // Two out-edges: branch intent is unknowable, so strip all and let canvas
+    // validation surface the gap (ADR 0013 symmetry).
+    expect(connectionsOf(designer)).toEqual([])
+  })
+
+  it("Remove_SingleInSingleOut_UndoRedoIsSingleStep", async () => {
+    mockFlow(linearActivities, linearConnections)
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    designer.removeNode("a-mid")
+    expect(connectionsOf(designer)).toEqual(["a-start->a-end"])
+
+    designer.undo()
+    expect(idsOf(designer)).toContain("a-mid")
+    expect(connectionsOf(designer).sort()).toEqual(["a-start->a-mid", "a-mid.Done->a-end"].sort())
+
+    designer.redo()
+    expect(idsOf(designer)).not.toContain("a-mid")
+    expect(connectionsOf(designer)).toEqual(["a-start->a-end"])
+  })
+
+  it("Remove_SelfLoop_SingleInSingleOut_NoRewire", async () => {
+    mockFlow(
+      [
+        { type: "Cike.RunJavaScript", id: "n1" },
+        { type: "Cike.RunJavaScript", id: "n2" },
+      ],
+      [
+        { source: { activityId: "n1" }, target: { activityId: "n2" } },
+        { source: { activityId: "n2", port: "Done" }, target: { activityId: "n1" } },
+      ],
+    )
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    designer.removeNode("n2")
+
+    // source (n1) === target (n1): a self-loop carries no rewire intent.
+    expect(idsOf(designer)).not.toContain("n2")
+    expect(connectionsOf(designer)).toEqual([])
+  })
+})

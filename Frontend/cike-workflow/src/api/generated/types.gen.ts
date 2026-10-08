@@ -162,6 +162,24 @@ export type CompletionCallbackState = {
     methodName?: string | null;
 };
 
+export type DispatchWorkflowDefinitionRequest = {
+    definitionVersionId?: string;
+    parentWorkflowInstanceId?: string | null;
+    input?: {
+        [key: string]: unknown;
+    };
+    properties?: {
+        [key: string]: unknown;
+    };
+    correlationId?: string | null;
+    instanceId?: string | null;
+    triggerActivityId?: string | null;
+    isDebug?: boolean;
+    schedulingActivityExecutionId?: string | null;
+    schedulingWorkflowInstanceId?: string | null;
+    schedulingCallStackDepth?: number | null;
+};
+
 export type ExceptionState = {
     typeName?: string;
     message?: string;
@@ -1127,6 +1145,29 @@ export type GetApiV1WorkflowInstancesByIdResponses = {
 };
 
 export type GetApiV1WorkflowInstancesByIdResponse = GetApiV1WorkflowInstancesByIdResponses[keyof GetApiV1WorkflowInstancesByIdResponses];
+
+export type PostApiV1WorkflowInstancesRunData = {
+    body: DispatchWorkflowDefinitionRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/WorkflowInstances/Run';
+};
+
+export type PostApiV1WorkflowInstancesRunErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+};
+
+export type PostApiV1WorkflowInstancesRunResponses = {
+    /**
+     * OK
+     */
+    200: string;
+};
+
+export type PostApiV1WorkflowInstancesRunResponse = PostApiV1WorkflowInstancesRunResponses[keyof PostApiV1WorkflowInstancesRunResponses];
 
 export type PostApiV1WorkflowInstancesDebugRunByIdData = {
     body?: RunDebugWorkflowDto;

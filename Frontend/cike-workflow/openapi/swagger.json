@@ -812,6 +812,39 @@
         }
       }
     },
+    "/api/v1/WorkflowInstances/Run": {
+      "post": {
+        "tags": [
+          "WorkflowInstanceService"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchWorkflowDefinitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
     "/api/v1/WorkflowInstances/DebugRun/{id}": {
       "post": {
         "tags": [
@@ -1573,6 +1606,60 @@
           },
           "methodName": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DispatchWorkflowDefinitionRequest": {
+        "type": "object",
+        "properties": {
+          "definitionVersionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "parentWorkflowInstanceId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "properties": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "instanceId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "triggerActivityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDebug": {
+            "type": "boolean"
+          },
+          "schedulingActivityExecutionId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "schedulingWorkflowInstanceId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "schedulingCallStackDepth": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           }
         },
