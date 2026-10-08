@@ -21,22 +21,25 @@ import { ActivityEndpoint } from "@/core/models/ActivityEndpoint"
 import {
   CommandStack,
   makeAddNodeCommand,
+  makeBatchCommand,
   makeConnectCommand,
   makeDisconnectCommand,
   makeMoveNodeCommand,
   makeRemoveNodeCommand,
   makeResizeNodeCommand,
+  makeShiftNodesCommand,
   type DesignerCommand,
 } from "@/core/designer/commands"
 import { buildPaletteGroups, type PaletteGroup } from "@/core/designer/palette"
 import type { ExpressionDescriptor, InputDefinition, InputDescriptor, OutputDefinition, OutputDescriptor, StorageDriverDescriptor, VariableDefinition, VariableTypeDescriptor } from "@/api/generated"
 import { ensureDrillTarget, isChainContainer } from "@/core/designer/drill"
 import { resolveRevealPath } from "@/core/designer/reveal"
-import { projectOrderedChain, projectFlowchart, projectCanvas, canDrillInto, type CanvasProjection } from "@/core/designer/projection"
+import { projectOrderedChain, projectFlowchart, projectCanvas, canDrillInto, getDefaultNodeSize, getOutPortsOf, getInPortsOf, type CanvasProjection } from "@/core/designer/projection"
+import { computeInsertPosition, computeShiftDelta, computeShiftIds, findConnectionByRef, type ConnectionRef } from "@/core/designer/insertion"
 import { activityShortName, resolveActivityClass } from "@/core/designer/registry"
 import { fromWireActivity, toWireActivity, type WireActivity } from "@/core/designer/serialization"
 import { computeNodeId } from "@/core/designer/nodeId"
-import { getCanvasState, setCanvasState, type DesignerCanvasMeta } from "@/core/designer/metadata"
+import { getCanvasState, getNodePosition, setCanvasState, type DesignerCanvasMeta, type DesignerNodeMeta } from "@/core/designer/metadata"
 import { cascadeRename, type ReferenceKind } from "@/core/designer/rename"
 import { extractApiErrorMessage } from "@/lib/apiError"
 
@@ -621,6 +624,78 @@ export function useWorkflowDesigner() {
     return getCanvasState(entry.activity)
   }
 
+  /** Whether a type can be inserted into a connection: it must have both an
+   *  entry and an outcome port (Start/End drop out). */
+  function isInsertableType(typeName: string): boolean {
+    const Ctor = resolveActivityClass(typeName)
+    if (!Ctor) return false
+    const probe = new Ctor()
+    return getInPortsOf(probe).length > 0 && getOutPortsOf(probe).length > 0
+  }
+
+  /** Palette groups filtered to connection-insertable types (insert menu). */
+  const insertableGroups = computed<PaletteGroup[]>(() =>
+    paletteGroups.value
+      .map((group) => ({ ...group, items: group.items.filter((item) => isInsertableType(item.typeName)) }))
+      .filter((group) => group.items.length > 0),
+  )
+
+  /**
+   * Edge insertion (ADR 0013): replace the connection identified by its
+   * endpoint triple with source→N and N(first outcome)→target, opening room
+   * by shifting the structural downstream only when the gap is too tight.
+   * The whole edit is ONE undo step; the new node ends up selected.
+   */
+  function insertNodeOnConnection(payload: ConnectionRef, typeName: string): boolean {
+    const entry = currentEntry.value
+    if (!entry || entry.chainChildren || readonly.value) return false
+    if (!isInsertableType(typeName)) return false
+    const Ctor = resolveActivityClass(typeName)!
+    const container = entry.activity as unknown as { activities: IActivity[]; connections?: ActivityConnection[] }
+    const connections = container.connections ?? []
+    const old = findConnectionByRef(connections, payload)
+    if (!old) return false
+    const rects = new Map(projection.value.nodes.map((node) => [node.id, node]))
+    const sourceRect = rects.get(payload.source)
+    const targetRect = rects.get(payload.target)
+    if (!sourceRect || !targetRect) return false
+
+    const activity = new Ctor()
+    activity.nodeId = computeNodeId(entry.activity.nodeId, activity.id)
+    const size = getDefaultNodeSize(activity)
+    const delta = computeShiftDelta(sourceRect, targetRect, size.width)
+    const shiftIds = delta > 0 ? computeShiftIds(connections, old, payload.source, payload.target) : []
+    const moves = shiftIds
+      .map((id) => {
+        const rect = rects.get(id)
+        const shifted = container.activities.find((child) => child.id === id)
+        if (!rect || !shifted) return null
+        return { activity: shifted, from: getNodePosition(shifted), to: { x: rect.x + delta, y: rect.y } }
+      })
+      .filter((move): move is { activity: IActivity; from: DesignerNodeMeta | null; to: DesignerNodeMeta } => move !== null)
+    // When nothing can shift (cycle guard), the gap stays as-is: place mid-current.
+    const appliedDelta = moves.length > 0 ? delta : 0
+    const position = computeInsertPosition(sourceRect, targetRect, appliedDelta, size)
+
+    const commands: DesignerCommand[] = [
+      makeDisconnectCommand(container as never, old),
+      makeAddNodeCommand(container as never, activity, position),
+      makeConnectCommand(
+        container as never,
+        new ActivityConnection(new ActivityEndpoint(payload.source, payload.sourcePort), new ActivityEndpoint(activity.id)),
+      ),
+      makeConnectCommand(
+        container as never,
+        new ActivityConnection(new ActivityEndpoint(activity.id, getOutPortsOf(activity)[0]), new ActivityEndpoint(payload.target)),
+      ),
+    ]
+    if (moves.length > 0) commands.push(makeShiftNodesCommand(moves))
+    executeCommand(makeBatchCommand("插入节点", commands))
+    selectedActivityId.value = activity.id
+    selectedEdgeId.value = null
+    return true
+  }
+
   /** Debounce window coalescing rapid edits into a single validation request. */
   const VALIDATE_DEBOUNCE_MS = 500
 
@@ -866,6 +941,8 @@ export function useWorkflowDesigner() {
     selectedEdgeId,
     connect,
     removeEdge,
+    insertNodeOnConnection,
+    insertableGroups,
     load,
     loadVersions,
     viewVersion,

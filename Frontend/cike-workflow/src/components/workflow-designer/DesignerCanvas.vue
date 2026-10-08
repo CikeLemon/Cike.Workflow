@@ -7,6 +7,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { Graph, Snapline, Transform, type Node as X6Node } from "@antv/x6"
 import type { CanvasProjection } from "@/core/designer/projection"
+import type { ConnectionRef } from "@/core/designer/insertion"
 import { getCanvasState, type DesignerCanvasMeta } from "@/core/designer/metadata"
 import { CIKE_NODE_SHAPE, registerDesignerShapes, TeleportContainer } from "./nodes/register"
 
@@ -17,6 +18,9 @@ const props = defineProps<{
   /** Identity of the current drill level; changing it restores its viewport. */
   entryKey: string
   entryActivity: unknown
+  /** Edge whose insert menu is open: its button stays visible while pinned.
+   *  Optional — read-only canvases (instance debug) never pass it. */
+  insertMenuEdgeId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -28,6 +32,7 @@ const emit = defineEmits<{
   dropActivity: [payload: { typeName: string; x: number; y: number }]
   edgeClick: [edgeId: string]
   connectRequest: [payload: { edgeId: string; source: string; sourcePort?: string; target: string }]
+  insertRequest: [payload: ConnectionRef & { edgeId: string; x: number; y: number }]
 }>()
 
 const containerRef = ref<HTMLDivElement>()
@@ -64,6 +69,61 @@ function clearEdgeSelection(): void {
   const previous = graph?.getCellById(selectedEdgeId)
   setEdgeHighlight(previous as never, 1.5)
   selectedEdgeId = null
+}
+
+/** Edge-insert button (ADR 0013): a hover affordance at the edge midpoint.
+ *  Registered as X6's built-in "button" tool — that name is also its identity
+ *  for hasTool/removeTool, and these edges carry no other button tools. */
+const INSERT_TOOL_NAME = "button"
+
+interface ToolBearingCell {
+  hasTool: (name: string) => boolean
+  addTools: (tool: unknown) => void
+  removeTool: (name: string) => void
+}
+
+function isInsertableEdge(edgeId: string): boolean {
+  if (!props.interactive) return false
+  const edge = props.projection.edges.find((candidate) => candidate.id === edgeId)
+  // Chain-container visual edges carry no model connection to insert into.
+  return !!edge && !edge.visual
+}
+
+function addInsertTool(edgeId: string): void {
+  const cell = graph?.getCellById(edgeId) as ToolBearingCell | null | undefined
+  if (!cell || cell.hasTool(INSERT_TOOL_NAME)) return
+  cell.addTools({
+    name: "button",
+    args: {
+      distance: 0.5,
+      markup: [
+        { tagName: "circle", selector: "button", attrs: { r: 10, class: "insert-btn-circle", "data-insert-btn": "" } },
+        { tagName: "path", selector: "icon", attrs: { d: "M -4 0 H 4 M 0 -4 V 4", class: "insert-btn-icon" } },
+      ],
+      onClick: (evt: MouseEvent) => {
+        evt.stopPropagation()
+        onInsertButtonClick(evt, edgeId)
+      },
+    },
+  })
+}
+
+function removeInsertTool(edgeId: string): void {
+  const cell = graph?.getCellById(edgeId) as ToolBearingCell | null | undefined
+  if (cell?.hasTool(INSERT_TOOL_NAME)) cell.removeTool(INSERT_TOOL_NAME)
+}
+
+function onInsertButtonClick(evt: MouseEvent, edgeId: string): void {
+  const edge = props.projection.edges.find((candidate) => candidate.id === edgeId)
+  if (!edge) return
+  emit("insertRequest", {
+    edgeId,
+    source: edge.source,
+    sourcePort: edge.sourcePort,
+    target: edge.target,
+    x: evt.clientX,
+    y: evt.clientY,
+  })
 }
 
 onMounted(() => {
@@ -110,6 +170,13 @@ onMounted(() => {
     emit("nodeClick", "")
   })
   graph.on("edge:click", ({ edge }) => selectEdge(String(edge.id)))
+  graph.on("edge:mouseenter", ({ edge }) => {
+    if (isInsertableEdge(String(edge.id))) addInsertTool(String(edge.id))
+  })
+  graph.on("edge:mouseleave", ({ edge }) => {
+    // Keep the button while its menu is open; otherwise hover-only.
+    if (String(edge.id) !== props.insertMenuEdgeId) removeInsertTool(String(edge.id))
+  })
   graph.on("edge:connected", ({ edge, isNew }) => {
     if (!isNew) return
     const source = edge.getSource()
@@ -156,6 +223,18 @@ onMounted(() => {
   })
   renderProjection()
   applyViewport()
+  // The insert button lives inside the edge view: swallow its mousedown/click
+  // before X6's delegated handlers so the click neither pans nor selects.
+  const guard = (event: Event): void => {
+    if ((event.target as Element).closest?.("[data-insert-btn]")) event.stopPropagation()
+  }
+  containerRef.value!.addEventListener("mousedown", guard, true)
+  containerRef.value!.addEventListener("click", guard, true)
+})
+
+watch(() => props.insertMenuEdgeId, (edgeId, previous) => {
+  if (previous && previous !== edgeId) removeInsertTool(previous)
+  if (edgeId) addInsertTool(edgeId)
 })
 
 watch(() => props.projection, renderProjection)
@@ -269,5 +348,22 @@ defineExpose({ viewportCenter, removeCellById })
   fill: var(--muted-foreground);
   font-size: 10px;
   user-select: none;
+}
+.canvas-surface :deep(.insert-btn-circle) {
+  fill: var(--card);
+  stroke: var(--border);
+  cursor: pointer;
+}
+.canvas-surface :deep(.insert-btn-icon) {
+  fill: none;
+  stroke: var(--muted-foreground);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+.canvas-surface :deep(.insert-btn-circle:hover) {
+  stroke: var(--primary);
+}
+.canvas-surface :deep(g:has(> .insert-btn-circle:hover) .insert-btn-icon) {
+  stroke: var(--primary);
 }
 </style>
