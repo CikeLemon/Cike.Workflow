@@ -77,10 +77,7 @@ public class JsonWorkflowStateSerializer : IWorkflowStateSerializer, ISingletonD
 
         // 读取端容忍旧版序列化产物中不在对象首位的 $id/$values 引用元数据（如 {"id":...,"$id":"1",...}），
         // 否则加载此类实例时抛 JsonException 并在仓储层回退为默认状态，实例数据丢失。
-        return new(_options)
-        {
-            ReferenceHandler = new CrossScopedReferenceHandler(),
-            AllowOutOfOrderMetadataProperties = true,
-        };
+        // AllowOutOfOrderMetadataProperties 由 JsonHelper.CreateOptionsInternal 提供并随副本继承。
+        return new(_options) { ReferenceHandler = new CrossScopedReferenceHandler() };
     }
 }

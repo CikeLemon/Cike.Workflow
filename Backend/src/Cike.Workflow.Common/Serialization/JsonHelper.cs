@@ -23,7 +23,10 @@ public static class JsonHelper
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
+            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+            // 读取端容忍旧版序列化产物中不在对象首位的 $id/$values 引用元数据；
+            // 对未启用 ReferenceHandler 的 options 是空操作，对启用的则避免乱序元数据抛 JsonException。
+            AllowOutOfOrderMetadataProperties = true
         };
 
         options.Converters.Add(new JsonStringEnumConverter());

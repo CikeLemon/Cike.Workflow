@@ -13,7 +13,9 @@ public class Variable : MemoryBlockReference
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             ReferenceHandler = ReferenceHandler.Preserve,
             PropertyNameCaseInsensitive = true,
-            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
+            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+            // 读取端容忍旧版序列化产物中不在对象首位的 $id/$values 引用元数据（启用了 Preserve，元数据读取生效）。
+            AllowOutOfOrderMetadataProperties = true
         }.WithConverters(
             new JsonStringEnumConverter(),
             new ExpandoObjectConverterFactory());
