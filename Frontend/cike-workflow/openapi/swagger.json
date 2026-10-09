@@ -504,6 +504,39 @@
         }
       }
     },
+    "/api/v1/WorkflowDefinitions/VersionOptions/{id}": {
+      "get": {
+        "tags": [
+          "WorkflowDefinitionService"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowDefinitionOptionsValueObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
     "/api/v1/WorkflowDefinitions": {
       "post": {
         "tags": [
@@ -2342,6 +2375,11 @@
               "publishedVersion": {
                 "type": "integer",
                 "format": "int32",
+                "nullable": true
+              },
+              "publishedVersionId": {
+                "type": "integer",
+                "format": "int64",
                 "nullable": true
               },
               "isReadonly": {

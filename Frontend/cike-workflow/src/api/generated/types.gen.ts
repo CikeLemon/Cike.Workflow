@@ -410,6 +410,7 @@ export type WorkflowDefinitionItemDto = WorkflowDefinitionFolderBaseDto & {
     version?: number;
     isLatest?: boolean;
     publishedVersion?: number | null;
+    publishedVersionId?: string | null;
     isReadonly?: boolean;
     isSystem?: boolean;
     materializerName?: string;
@@ -953,6 +954,31 @@ export type GetApiV1WorkflowDefinitionsVersionListResponses = {
 };
 
 export type GetApiV1WorkflowDefinitionsVersionListResponse = GetApiV1WorkflowDefinitionsVersionListResponses[keyof GetApiV1WorkflowDefinitionsVersionListResponses];
+
+export type GetApiV1WorkflowDefinitionsVersionOptionsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/WorkflowDefinitions/VersionOptions/{id}';
+};
+
+export type GetApiV1WorkflowDefinitionsVersionOptionsByIdErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+};
+
+export type GetApiV1WorkflowDefinitionsVersionOptionsByIdResponses = {
+    /**
+     * OK
+     */
+    200: WorkflowDefinitionOptionsValueObject;
+};
+
+export type GetApiV1WorkflowDefinitionsVersionOptionsByIdResponse = GetApiV1WorkflowDefinitionsVersionOptionsByIdResponses[keyof GetApiV1WorkflowDefinitionsVersionOptionsByIdResponses];
 
 export type PostApiV1WorkflowDefinitionsData = {
     body: AddWorkflowDefinitionDto;
