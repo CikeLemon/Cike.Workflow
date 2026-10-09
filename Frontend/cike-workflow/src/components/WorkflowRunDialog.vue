@@ -2,15 +2,15 @@
   <Dialog :open="open" @update:open="(v: boolean) => emit('update:open', v)">
     <DialogContent class="sm:max-w-lg">
       <DialogHeader>
-        <DialogTitle>启动调试</DialogTitle>
-        <DialogDescription>
-          {{ hasInputs ? "填写工作流输入参数，留空的字段将由后端求值默认表达式。" : "该工作流无输入参数，将直接启动调试。" }}
-        </DialogDescription>
+        <DialogTitle>{{ title }}</DialogTitle>
+        <DialogDescription>{{ resolvedDescription }}</DialogDescription>
       </DialogHeader>
 
-      <div v-if="hasInputs" class="max-h-80 space-y-4 overflow-y-auto pr-1">
+      <div v-if="loading" class="py-6 text-center text-sm text-muted-foreground">正在加载工作流输入…</div>
+
+      <div v-else-if="hasInputs" class="max-h-80 space-y-4 overflow-y-auto pr-1">
         <div v-for="input in inputs" :key="input.name" class="space-y-1.5">
-          <Label :for="`debug-input-${input.name}`">
+          <Label :for="`run-input-${input.name}`">
             {{ input.displayName || input.name }}
             <span v-if="input.type" class="ml-1 text-xs text-muted-foreground">{{ input.type }}{{ input.isArray ? "[]" : "" }}</span>
           </Label>
@@ -18,7 +18,7 @@
           <!-- Boolean → Switch -->
           <div v-if="isBooleanInput(input)" class="flex items-center gap-2">
             <Switch
-              :id="`debug-input-${input.name}`"
+              :id="`run-input-${input.name}`"
               :model-value="form[input.name!] === 'true'"
               @update:model-value="(v: boolean) => { form[input.name!] = String(v) }"
             />
@@ -28,7 +28,7 @@
           <!-- JSON / Array / Object → Textarea -->
           <Textarea
             v-else-if="isJsonInput(input)"
-            :id="`debug-input-${input.name}`"
+            :id="`run-input-${input.name}`"
             v-model="form[input.name!]"
             :placeholder="placeholderFor(input) || '输入 JSON…'"
             rows="3"
@@ -38,7 +38,7 @@
           <!-- Number → Input type=number -->
           <Input
             v-else-if="isNumberInput(input)"
-            :id="`debug-input-${input.name}`"
+            :id="`run-input-${input.name}`"
             v-model="form[input.name!]"
             type="number"
             :placeholder="placeholderFor(input)"
@@ -47,7 +47,7 @@
           <!-- String / DateTime / default → text input -->
           <Input
             v-else
-            :id="`debug-input-${input.name}`"
+            :id="`run-input-${input.name}`"
             v-model="form[input.name!]"
             :type="input.type?.toLowerCase() === 'datetime' ? 'datetime-local' : 'text'"
             :placeholder="placeholderFor(input)"
@@ -63,8 +63,8 @@
 
       <DialogFooter>
         <Button variant="outline" :disabled="running" @click="emit('update:open', false)">取消</Button>
-        <Button :disabled="running" @click="confirm">
-          {{ running ? "启动中…" : "启动调试" }}
+        <Button :disabled="running || loading" @click="confirm">
+          {{ running ? "启动中…" : confirmText }}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -88,12 +88,29 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import type { InputDefinition } from "@/api/generated"
 
-const props = defineProps<{
-  open: boolean
-  inputs: InputDefinition[]
-  running: boolean
-  error: string | null
-}>()
+/**
+ * Shared workflow-input collection dialog. Renders a type-appropriate control per
+ * declared InputDefinition, pre-fills Literal defaults, and emits the assembled
+ * input payload on confirm. Reused by both the designer debug-run entry and the
+ * definition-list run entry; wording (title/description/confirmText) is host-provided.
+ */
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    inputs: InputDefinition[]
+    running: boolean
+    error: string | null
+    loading?: boolean
+    title?: string
+    description?: string
+    confirmText?: string
+  }>(),
+  {
+    loading: false,
+    title: "运行工作流",
+    confirmText: "启动运行",
+  },
+)
 
 const emit = defineEmits<{
   "update:open": [open: boolean]
@@ -104,9 +121,12 @@ const emit = defineEmits<{
 const form = reactive<Record<string, string>>({})
 
 watch(
-  () => props.open,
-  (open) => {
-    if (!open) return
+  () => [props.open, props.loading] as const,
+  ([open, loading]) => {
+    // Pre-fill only once the dialog is open AND inputs are settled: the list-run
+    // entry opens the dialog first (loading=true) then streams inputs in, so an
+    // open-only watch would pre-fill against an empty array and drop defaults.
+    if (!open || loading) return
     // Reset form and pre-fill Literal defaults
     for (const key of Object.keys(form)) delete form[key]
     for (const input of props.inputs) {
@@ -146,6 +166,16 @@ function isJsonInput(input: InputDefinition): boolean {
 }
 
 const hasInputs = computed(() => props.inputs.length > 0)
+
+const resolvedDescription = computed(() => {
+  if (props.loading) return "正在加载已发布版本的工作流输入…"
+  return (
+    props.description ??
+    (hasInputs.value
+      ? "填写工作流输入参数，留空的字段将由后端求值默认表达式。"
+      : "该工作流无输入参数，将直接启动。")
+  )
+})
 
 function buildInputPayload(): Record<string, unknown> {
   const payload: Record<string, unknown> = {}

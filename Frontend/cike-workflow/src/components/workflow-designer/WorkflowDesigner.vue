@@ -136,11 +136,14 @@
 
     <PublishDialog :designer="designer" :open="publishOpen" @update:open="(open: boolean) => (publishOpen = open)" />
 
-    <DebugRunDialog
+    <WorkflowRunDialog
       :open="debugOpen"
       :inputs="designer.inputs.value"
       :running="debugRunning"
       :error="debugError"
+      title="启动调试"
+      :description="debugDescription"
+      confirm-text="启动调试"
       @update:open="(open: boolean) => (debugOpen = open)"
       @confirm="onDebugConfirm"
     />
@@ -174,7 +177,7 @@ import DesignerCanvas from "./DesignerCanvas.vue"
 import ActivityPalette from "./ActivityPalette.vue"
 import RightToolDock from "./RightToolDock.vue"
 import PublishDialog from "./PublishDialog.vue"
-import DebugRunDialog from "./DebugRunDialog.vue"
+import WorkflowRunDialog from "@/components/WorkflowRunDialog.vue"
 import ProblemListPanel from "./ProblemListPanel.vue"
 import VersionHistorySheet from "./VersionHistorySheet.vue"
 import InsertActivityMenu from "./InsertActivityMenu.vue"
@@ -192,6 +195,12 @@ const editOpen = ref(false)
 const debugOpen = ref(false)
 const debugRunning = ref(false)
 const debugError = ref<string | null>(null)
+/** Debug-specific dialog copy; the shared run dialog defaults to run wording. */
+const debugDescription = computed(() =>
+  props.designer.inputs.value.length > 0
+    ? "填写工作流输入参数，留空的字段将由后端求值默认表达式。"
+    : "该工作流无输入参数，将直接启动调试。",
+)
 /** Problem list dock open state; auto-expands when validation finds problems. */
 const problemPanelOpen = ref(false)
 

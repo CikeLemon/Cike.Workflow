@@ -152,6 +152,19 @@
               </TableCell>
               <TableCell class="text-right">
                 <div class="flex justify-end gap-1 opacity-0 group-hover:opacity-100">
+                  <span
+                    class="inline-flex"
+                    :title="getDefinitionData(item)?.publishedVersionId ? '运行' : '未发布，无法运行'"
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      :disabled="!getDefinitionData(item)?.publishedVersionId"
+                      @click="openRun(item)"
+                    >
+                      <Play />
+                    </Button>
+                  </span>
                   <Button variant="ghost" size="icon-xs" title="编辑" @click="openEditDefinition(item)">
                     <Pencil />
                   </Button>
@@ -215,6 +228,18 @@
       @moved="refresh"
     />
 
+    <!-- 运行对话框（仅最新已发布版本） -->
+    <WorkflowRunDialog
+      v-model:open="runDialogOpen"
+      :inputs="runInputs"
+      :running="runRunning"
+      :loading="runLoading"
+      :error="runError"
+      title="运行工作流"
+      confirm-text="启动运行"
+      @confirm="onRunConfirm"
+    />
+
     <!-- 删除确认对话框 -->
     <AlertDialog v-model:open="deleteDialogOpen">
       <AlertDialogContent class="sm:max-w-md">
@@ -249,18 +274,21 @@
 import { ref, computed, watch } from "vue"
 import { RouterLink, useRoute, useRouter } from "vue-router"
 import { useClipboard } from "@vueuse/core"
-import { Folder, Workflow, Plus, Search, Pencil, Trash2, Move, ChevronRight, Home, Copy, Check } from "@lucide/vue"
+import { Folder, Workflow, Plus, Search, Pencil, Trash2, Move, ChevronRight, Home, Copy, Check, Play } from "@lucide/vue"
 import {
   getApiV1WorkflowDefinitionsList,
+  getApiV1WorkflowDefinitionsById,
   getApiV1Folders,
   deleteApiV1Folders,
   deleteApiV1WorkflowDefinitionsById,
+  postApiV1WorkflowInstancesRun,
 } from "@/api"
 import type {
   WorkflowDefinitionFolderItemDto,
   WorkflowDefinitionItemDto,
   FolderDetailDto,
   FolderPathDto,
+  InputDefinition,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -284,6 +312,7 @@ import {
 import FolderFormDialog from "@/components/FolderFormDialog.vue"
 import DefinitionFormDialog from "@/components/DefinitionFormDialog.vue"
 import MoveDefinitionDialog from "@/components/MoveDefinitionDialog.vue"
+import WorkflowRunDialog from "@/components/WorkflowRunDialog.vue"
 import { extractApiErrorMessage } from "@/lib/apiError"
 
 const ROOT_FOLDER_ID = "0"
@@ -428,6 +457,62 @@ const movingDefinition = ref<WorkflowDefinitionFolderItemDto | null>(null)
 function openMoveDefinition(item: WorkflowDefinitionFolderItemDto) {
   movingDefinition.value = item
   moveDialogOpen.value = true
+}
+
+// --- 运行（仅最新已发布版本）---
+// Runs the frozen published snapshot, so there is no auto-save step (unlike the
+// designer's debug run). Target version is the list-provided publishedVersionId.
+const runDialogOpen = ref(false)
+const runInputs = ref<InputDefinition[]>([])
+const runRunning = ref(false)
+const runLoading = ref(false)
+const runError = ref<string | null>(null)
+const runVersionId = ref<string | null>(null)
+
+async function openRun(item: WorkflowDefinitionFolderItemDto) {
+  const versionId = getDefinitionData(item)?.publishedVersionId
+  if (!versionId) return
+  runVersionId.value = versionId
+  runInputs.value = []
+  runError.value = null
+  // Open first with a loading state, then stream the published version's inputs
+  // in; the dialog pre-fills defaults once loading flips false.
+  runLoading.value = true
+  runDialogOpen.value = true
+  try {
+    const { data, error } = await getApiV1WorkflowDefinitionsById({ path: { id: versionId } })
+    if (error || !data) {
+      runError.value = extractApiErrorMessage(error, "加载工作流输入失败，请稍后重试")
+      return
+    }
+    const options = (data as { options?: { inputs?: InputDefinition[] } | null }).options
+    runInputs.value = options?.inputs ?? []
+  } finally {
+    runLoading.value = false
+  }
+}
+
+async function onRunConfirm(input: Record<string, unknown>) {
+  const versionId = runVersionId.value
+  if (!versionId || runRunning.value) return
+  runRunning.value = true
+  runError.value = null
+  try {
+    const { data, error } = await postApiV1WorkflowInstancesRun({
+      body: { definitionVersionId: versionId, input, isDebug: false },
+    })
+    if (error || data == null) {
+      runError.value = extractApiErrorMessage(error, "运行失败，请稍后重试")
+      return
+    }
+    runDialogOpen.value = false
+    router.push({
+      name: "instance-detail",
+      params: { workspaceId, instanceId: String(data) },
+    })
+  } finally {
+    runRunning.value = false
+  }
 }
 
 // --- 删除确认 ---
