@@ -7,6 +7,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { Graph, Snapline, Transform, type Node as X6Node } from "@antv/x6"
 import type { CanvasProjection } from "@/core/designer/projection"
+import type { ConnectionRef } from "@/core/designer/insertion"
 import { getCanvasState, type DesignerCanvasMeta } from "@/core/designer/metadata"
 import { CIKE_NODE_SHAPE, registerDesignerShapes, TeleportContainer } from "./nodes/register"
 
@@ -17,6 +18,12 @@ const props = defineProps<{
   /** Identity of the current drill level; changing it restores its viewport. */
   entryKey: string
   entryActivity: unknown
+  /** Edge whose insert menu is open: its button stays visible while pinned.
+   *  Optional — read-only canvases (instance debug) never pass it. */
+  insertMenuEdgeId?: string | null
+  /** Selected edge: drives the highlight from parent state so it survives
+   *  full projection re-renders. Optional — instance debug never selects. */
+  selectedEdgeId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -28,11 +35,11 @@ const emit = defineEmits<{
   dropActivity: [payload: { typeName: string; x: number; y: number }]
   edgeClick: [edgeId: string]
   connectRequest: [payload: { edgeId: string; source: string; sourcePort?: string; target: string }]
+  insertRequest: [payload: ConnectionRef & { edgeId: string; x: number; y: number }]
 }>()
 
 const containerRef = ref<HTMLDivElement>()
 let graph: Graph | null = null
-let selectedEdgeId: string | null = null
 /** Positions captured on node:mousedown for move-command undo. */
 const dragOrigins = new Map<string, { x: number; y: number } | null>()
 /** Sizes captured on node:resize:start for resize-command undo. */
@@ -45,25 +52,79 @@ function onDrop(event: DragEvent): void {
   emit("dropActivity", { typeName, x: point.x, y: point.y })
 }
 
-function setEdgeHighlight(edge: { setAttrByPath?: (path: string, value: unknown) => void } | null, width: number): void {
-  edge?.setAttrByPath?.("line/strokeWidth", width)
+/** Selection look for exactly one edge: primary color (the CSS class flips
+ *  the currentColor the stroke inherits) plus a thicker line. Idempotent, so
+ *  it can be re-applied after every full projection re-render. */
+function paintEdgeSelection(edgeId: string | null): void {
+  if (!graph) return
+  for (const edge of graph.getEdges()) {
+    const selected = String(edge.id) === edgeId
+    graph.findViewByCell(edge)?.container.classList.toggle("edge-selected", selected)
+    edge.setAttrByPath("line/strokeWidth", selected ? 2.5 : 1.5)
+  }
 }
 
 function selectEdge(edgeId: string): void {
-  if (selectedEdgeId === edgeId) return
-  const previous = selectedEdgeId ? graph?.getCellById(selectedEdgeId) : null
-  setEdgeHighlight(previous as never, 1.5)
-  selectedEdgeId = edgeId
-  const current = graph?.getCellById(edgeId)
-  setEdgeHighlight(current as never, 3)
+  if (props.selectedEdgeId === edgeId) return
+  // Paint now for instant feedback; the selectedEdgeId watch reconciles.
+  paintEdgeSelection(edgeId)
   emit("edgeClick", edgeId)
 }
 
-function clearEdgeSelection(): void {
-  if (!selectedEdgeId) return
-  const previous = graph?.getCellById(selectedEdgeId)
-  setEdgeHighlight(previous as never, 1.5)
-  selectedEdgeId = null
+/** Edge-insert button (ADR 0013): a hover affordance at the edge midpoint.
+ *  Registered as X6's built-in "button" tool — that name is also its identity
+ *  for hasTool/removeTool, and these edges carry no other button tools. */
+const INSERT_TOOL_NAME = "button"
+
+interface ToolBearingCell {
+  hasTool: (name: string) => boolean
+  addTools: (tool: unknown) => void
+  removeTool: (name: string) => void
+}
+
+function isInsertableEdge(edgeId: string): boolean {
+  if (!props.interactive) return false
+  const edge = props.projection.edges.find((candidate) => candidate.id === edgeId)
+  // Chain-container visual edges carry no model connection to insert into.
+  return !!edge && !edge.visual
+}
+
+function addInsertTool(edgeId: string): void {
+  const cell = graph?.getCellById(edgeId) as ToolBearingCell | null | undefined
+  if (!cell || cell.hasTool(INSERT_TOOL_NAME)) return
+  cell.addTools({
+    name: "button",
+    args: {
+      distance: 0.5,
+      markup: [
+        { tagName: "circle", selector: "button", attrs: { r: 10, class: "insert-btn-circle", "data-insert-btn": "" } },
+        { tagName: "path", selector: "icon", attrs: { d: "M -4 0 H 4 M 0 -4 V 4", class: "insert-btn-icon" } },
+      ],
+      onClick: ({ e }: { e: MouseEvent }) => {
+        // X6's Button tool already stopPropagation+preventDefault on the
+        // mousedown it fires this from, so panning is suppressed for free.
+        onInsertButtonClick(e, edgeId)
+      },
+    },
+  })
+}
+
+function removeInsertTool(edgeId: string): void {
+  const cell = graph?.getCellById(edgeId) as ToolBearingCell | null | undefined
+  if (cell?.hasTool(INSERT_TOOL_NAME)) cell.removeTool(INSERT_TOOL_NAME)
+}
+
+function onInsertButtonClick(evt: MouseEvent, edgeId: string): void {
+  const edge = props.projection.edges.find((candidate) => candidate.id === edgeId)
+  if (!edge) return
+  emit("insertRequest", {
+    edgeId,
+    source: edge.source,
+    sourcePort: edge.sourcePort,
+    target: edge.target,
+    x: evt.clientX,
+    y: evt.clientY,
+  })
 }
 
 onMounted(() => {
@@ -87,7 +148,7 @@ onMounted(() => {
       allowMulti: "withPort",
       highlight: true,
       connectionPoint: "boundary",
-      connector: { name: "rounded", args: { radius: 8 } },
+      connector: { name: "smooth" },
       validateConnection: ({ sourceCell, targetCell, targetPort }) => {
         if (!sourceCell || !targetCell || sourceCell === targetCell) return false
         const target = props.projection.nodes.find((node) => node.id === String(targetCell.id))
@@ -106,10 +167,17 @@ onMounted(() => {
   }
   graph.on("node:click", ({ node }) => emit("nodeClick", String(node.id)))
   graph.on("blank:click", () => {
-    clearEdgeSelection()
+    paintEdgeSelection(null)
     emit("nodeClick", "")
   })
   graph.on("edge:click", ({ edge }) => selectEdge(String(edge.id)))
+  graph.on("edge:mouseenter", ({ edge }) => {
+    if (isInsertableEdge(String(edge.id))) addInsertTool(String(edge.id))
+  })
+  graph.on("edge:mouseleave", ({ edge }) => {
+    // Keep the button while its menu is open; otherwise hover-only.
+    if (String(edge.id) !== props.insertMenuEdgeId) removeInsertTool(String(edge.id))
+  })
   graph.on("edge:connected", ({ edge, isNew }) => {
     if (!isNew) return
     const source = edge.getSource()
@@ -156,10 +224,27 @@ onMounted(() => {
   })
   renderProjection()
   applyViewport()
+  // The insert button lives on X6's decorator layer, but its tool container
+  // carries data-cell-id, so a click on it would still resolve to the edge and
+  // fire edge:click (mis-selecting) or blank:click (deselecting). X6's Button
+  // tool already stops the MOUSEDOWN (no pan); we additionally swallow the
+  // button's CLICK in the capture phase. We must NOT guard mousedown here: X6
+  // fires the tool's onClick from its own mousedown handler, and a capture-phase
+  // mousedown guard would stop it before the button ever runs.
+  const guardClick = (event: Event): void => {
+    if ((event.target as Element).closest?.("[data-insert-btn]")) event.stopPropagation()
+  }
+  containerRef.value!.addEventListener("click", guardClick, true)
+})
+
+watch(() => props.insertMenuEdgeId, (edgeId, previous) => {
+  if (previous && previous !== edgeId) removeInsertTool(previous)
+  if (edgeId) addInsertTool(edgeId)
 })
 
 watch(() => props.projection, renderProjection)
 watch(() => props.selectedId, renderProjection)
+watch(() => props.selectedEdgeId, (edgeId) => paintEdgeSelection(edgeId ?? null))
 watch(() => props.entryKey, () => applyViewport())
 
 onBeforeUnmount(() => {
@@ -223,7 +308,7 @@ function renderProjection(): void {
       zIndex: 0,
       source: edge.sourcePort ? { cell: edge.source, port: edge.sourcePort } : { cell: edge.source },
       target: targetInPort ? { cell: edge.target, port: targetInPort } : { cell: edge.target },
-      connector: { name: "rounded", args: { radius: 8 } },
+      connector: { name: "smooth" },
       attrs: {
         line: {
           stroke: "currentColor",
@@ -235,6 +320,8 @@ function renderProjection(): void {
     })
   }
   graph.fromJSON({ cells })
+  // fromJSON rebuilds every view, wiping classes/attrs: re-apply selection.
+  paintEdgeSelection(props.selectedEdgeId ?? null)
 }
 
 function removeCellById(cellId: string): void {
@@ -254,6 +341,11 @@ defineExpose({ viewportCenter, removeCellById })
 .canvas-surface :deep(.x6-edge) {
   color: var(--muted-foreground);
 }
+/* Selected edge: the stroke inherits currentColor, so flipping color here
+   turns the line primary in both themes without hardcoding hex values. */
+.canvas-surface :deep(.x6-edge.edge-selected) {
+  color: var(--primary);
+}
 .canvas-surface :deep(.x6-port-body circle) {
   stroke: var(--muted-foreground);
   fill: var(--card);
@@ -269,5 +361,22 @@ defineExpose({ viewportCenter, removeCellById })
   fill: var(--muted-foreground);
   font-size: 10px;
   user-select: none;
+}
+.canvas-surface :deep(.insert-btn-circle) {
+  fill: var(--card);
+  stroke: var(--border);
+  cursor: pointer;
+}
+.canvas-surface :deep(.insert-btn-icon) {
+  fill: none;
+  stroke: var(--muted-foreground);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+.canvas-surface :deep(.insert-btn-circle:hover) {
+  stroke: var(--primary);
+}
+.canvas-surface :deep(g:has(> .insert-btn-circle:hover) .insert-btn-icon) {
+  stroke: var(--primary);
 }
 </style>

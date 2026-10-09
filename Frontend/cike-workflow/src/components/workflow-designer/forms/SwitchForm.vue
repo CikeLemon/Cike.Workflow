@@ -105,7 +105,10 @@ function commit(nextCases: CaseCondition[]): void {
   const activity = act.value
   const customProperties = activity.customProperties as Record<string, unknown>
   const fromContainer = customProperties["customExpression"] ?? null
-  const wireCases = nextCases.map((entry) => ({ label: entry.label, value: compileCondition(entry) }))
+  const wireCases = nextCases.map((entry) => ({
+    label: entry.label,
+    value: compileCondition(entry, props.designer.variables.value, props.designer.inputs.value),
+  }))
   props.designer.executeCommand(
     makeBatchCommand("修改分支", [
       makeEditPropertyCommand(activity as unknown as Record<string, unknown>, "cases", activity.cases ?? null, wireCases),
@@ -151,7 +154,7 @@ watch(
     container.caseConditions.forEach((entry, index) => {
       const wire = activity.cases?.[index]
       if (!wire?.value) return
-      const compiled = compileCondition(entry)
+      const compiled = compileCondition(entry, props.designer.variables.value, props.designer.inputs.value)
       if (wire.value.type !== compiled.type || wire.value.value !== compiled.value) {
         makeSetExpressionCommand(wire.value, compiled).apply()
       }

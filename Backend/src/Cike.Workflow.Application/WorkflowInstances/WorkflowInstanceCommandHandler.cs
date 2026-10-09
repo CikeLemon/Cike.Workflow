@@ -11,7 +11,9 @@ internal class WorkflowInstanceCommandHandler(
     [LocalEventHandler]
     public async Task RunAsync(RunWorkflowCommand command, CancellationToken cancellationToken)
     {
+        command.Request.InstanceId ??= identityGenerator.NextId();
         await workflowDispatcher.DispatchAsync(command.Request, new DispatchWorkflowOptions(), cancellationToken: cancellationToken);
+        command.Id = command.Request.InstanceId.Value;
     }
 
     [LocalEventHandler]

@@ -24,6 +24,7 @@ import { ensureDrillTarget, isChainContainer } from "@/core/designer/drill"
 import { activityShortName } from "@/core/designer/registry"
 import { ACTIVITY_STATUS_UI, formatDateTime, formatDuration } from "@/core/designer/execution"
 import InstanceIoSection from "@/components/InstanceIoSection.vue"
+import JsonViewer from "@/components/JsonViewer.vue"
 import type { IActivity } from "@/core/abstracts/Activity"
 
 const route = useRoute()
@@ -200,11 +201,6 @@ function goBack(): void {
 // ---------------------------------------------------------------------------
 const selectedRecord = computed(() => exec.selectedRecord.value)
 
-function jsonDisplay(obj: unknown): string {
-  if (obj == null) return "—"
-  try { return JSON.stringify(obj, null, 2) } catch { return String(obj) }
-}
-
 const recordStatusUi = computed(() => {
   const s = selectedRecord.value?.status as ActivityStatus | undefined
   return s != null ? ACTIVITY_STATUS_UI[s] : null
@@ -331,15 +327,15 @@ const outputValues = computed(() => exec.instance.value?.workflowState?.output)
                 </section>
                 <section v-if="selectedRecord.activityState">
                   <h4 class="mb-1 text-xs font-semibold text-muted-foreground">活动状态</h4>
-                  <pre class="max-h-48 overflow-auto rounded bg-muted/50 p-2 text-xs font-mono">{{ jsonDisplay(selectedRecord.activityState) }}</pre>
+                  <JsonViewer :value="selectedRecord.activityState" title="活动状态" />
                 </section>
                 <section v-if="selectedRecord.outputs">
                   <h4 class="mb-1 text-xs font-semibold text-muted-foreground">输出</h4>
-                  <pre class="max-h-48 overflow-auto rounded bg-muted/50 p-2 text-xs font-mono">{{ jsonDisplay(selectedRecord.outputs) }}</pre>
+                  <JsonViewer :value="selectedRecord.outputs" title="输出" />
                 </section>
                 <section v-if="selectedRecord.exception">
                   <h4 class="mb-1 text-xs font-semibold text-destructive">异常</h4>
-                  <pre class="max-h-32 overflow-auto rounded bg-destructive/5 p-2 text-xs font-mono text-destructive">{{ jsonDisplay(selectedRecord.exception) }}</pre>
+                  <JsonViewer :value="selectedRecord.exception" title="异常" height="128px" />
                 </section>
               </template>
               <p v-else class="text-xs text-muted-foreground">点击画布节点查看执行详情</p>

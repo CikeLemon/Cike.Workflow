@@ -42,6 +42,16 @@ public class WorkflowInstanceService : MinimalApiServiceBase
         return TypedResults.Ok(query.Result);
     }
 
+    [MinimalApiRoute("/api/v1/WorkflowInstances/Run", ["Post"])]
+    public async Task<Results<Ok<long>, BadRequest>> RunAsync([FromServices] ILocalEventBus localEventBus,
+        DispatchWorkflowDefinitionRequest dto,
+        CancellationToken cancellationToken = default)
+    {
+        var command = new RunWorkflowCommand(dto);
+        await localEventBus.PublishAsync(command, cancellationToken);
+        return TypedResults.Ok(command.Id);
+    }
+
     /// <summary>
     /// 对草稿版本行发起调试（试跑）：从开始节点启动，实例标记 IsDebug。
     /// 返回预生成的实例 Id；派发同步完成，返回时实例已创建并执行（未挂起即到终态）。

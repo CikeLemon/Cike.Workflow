@@ -71,6 +71,7 @@
             :projection="designer.projection.value"
             :interactive="!designer.readonly.value"
             :selected-id="designer.selectedActivityId.value"
+            :selected-edge-id="designer.selectedEdgeId.value"
             :entry-key="entryKey"
             :entry-activity="designer.currentEntry.value?.activity ?? null"
             @node-click="(id: string) => { designer.selectedActivityId.value = id || null; designer.selectedEdgeId.value = null }"
@@ -81,6 +82,16 @@
             @drop-activity="(payload) => designer.addNode(payload.typeName, { x: payload.x, y: payload.y })"
             @edge-click="(edgeId: string) => { designer.selectedActivityId.value = null; designer.selectedEdgeId.value = edgeId }"
             @connect-request="onConnectRequest"
+            :insert-menu-edge-id="insertMenu?.edgeId ?? null"
+            @insert-request="(payload) => (insertMenu = payload)"
+          />
+          <InsertActivityMenu
+            v-if="insertMenu"
+            :groups="designer.insertableGroups.value"
+            :x="insertMenu.x"
+            :y="insertMenu.y"
+            @select="onInsertSelect"
+            @close="insertMenu = null"
           />
           <!-- Failure banner is a notification, not content: capped height with
                internal scroll and a dismiss button so a backend stack trace can
@@ -154,6 +165,7 @@ import { ArrowLeft, History, Pencil, Play, Redo2, RotateCcw, Trash2, Undo2, Uplo
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { WorkflowDesignerState } from "@/composables/useWorkflowDesigner"
+import type { ConnectionRef } from "@/core/designer/insertion"
 import type { WorkflowDefinitionFolderItemDto } from "@/api/generated"
 import DefinitionFormDialog from "@/components/DefinitionFormDialog.vue"
 import ThemeToggle from "@/components/layout/ThemeToggle.vue"
@@ -165,6 +177,7 @@ import PublishDialog from "./PublishDialog.vue"
 import DebugRunDialog from "./DebugRunDialog.vue"
 import ProblemListPanel from "./ProblemListPanel.vue"
 import VersionHistorySheet from "./VersionHistorySheet.vue"
+import InsertActivityMenu from "./InsertActivityMenu.vue"
 
 const props = defineProps<{ designer: WorkflowDesignerState }>()
 
@@ -284,6 +297,16 @@ function addAtCenter(typeName: string): void {
 function onConnectRequest(payload: { edgeId: string; source: string; sourcePort?: string; target: string }): void {
   const accepted = props.designer.connect(payload)
   if (!accepted) canvasRef.value?.removeCellById(payload.edgeId)
+}
+
+/** Anchor of the edge-insert menu; null while closed. */
+const insertMenu = ref<(ConnectionRef & { edgeId: string; x: number; y: number }) | null>(null)
+
+function onInsertSelect(typeName: string): void {
+  const menu = insertMenu.value
+  insertMenu.value = null
+  if (!menu) return
+  props.designer.insertNodeOnConnection({ source: menu.source, sourcePort: menu.sourcePort, target: menu.target }, typeName)
 }
 
 function onKeydown(event: KeyboardEvent): void {

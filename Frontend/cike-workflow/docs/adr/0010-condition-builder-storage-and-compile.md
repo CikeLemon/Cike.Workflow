@@ -26,9 +26,9 @@ Switch 的 `caseConditions[i].label` 投影为出端口；`mode`（首个优先/
 ## 编译契约（前端纯函数）
 
 - **操作数**：`Literal` 按 `dataType` 出 JS 字面量（string 加引号转义、number 原样、boolean `true/false`、datetime→`new Date('ISO').getTime()`）；`Variable`→`getVariable('名字')`、`Input`/`WorkflowInput`→`getInput('名字')`（后端 Jint 注册的两个访问器）；存量 `Javascript` 原样内联（空脚本降级为 `undefined`，保证产物语法合法）。
-- **运算符**：`=→===`、`!=→!==`、`> >= < <=` 原样；字符串另有 `contains/notContains/startsWith/endsWith`（编译为 `String(l).includes(r)` 等）与一元的 `empty/notEmpty`。
+- **运算符**：`=→===`、`!=→!==`、`> >= < <=` 原样；字符串另有 `contains/notContains/startsWith/endsWith`（编译为 `String(l).includes(r)` 等）；一元 `empty/notEmpty` 对 string/number/datetime 可用。
 - **组**：`conditions[]` 用 `conditionType` 的 `&&`/`||` 连接，再与 `"(" + compile(combineCondition) + ")"` 用同一操作符接合；嵌套子组整体加括号保证优先级；某侧为空退化为恒等（空组 = `true`）。
-- **运算符/控件按 dataType 分集**：number、datetime = `= != > >= < <=`；string 另加 `contains notContains startsWith endsWith empty notEmpty`；boolean = `= !=`。Literal 控件按 dataType 渲染（文本/数字/开关/日期时间）。dataType 仅挂在 Literal 操作数上；比较的有效 dataType 取"右侧字面量→左侧字面量→string"的回退链，两侧皆为 Variable/Input 时按 string 集。
+- **运算符/控件按 dataType 分集**：number、datetime = `= != > >= < <= empty notEmpty`；string 另加 `contains notContains startsWith endsWith`；boolean = `= !=`。Literal 控件按 dataType 渲染（文本/数字/开关/日期时间）。dataType 仅挂在 Literal 操作数上；比较的有效 dataType 取“引用操作数（Variable/Input 按名字解析到工作流变量/输入定义的 CLR 类型名，左优先于右）→ 右侧字面量 → 左侧字面量 → string”的回退链。引用类型可解析时它是权威：显示层把该行 Literal 操作数的 dataType 选择器锁定为引用类型，编译层经 `normalizeGroup` 派生钉型（value 按目标类型强制），存库 builder 树不被改写；builder 树是非响应式普通对象且名字编辑由 ExpressionEditor 自有命令写入，组编辑器订阅 designer revision 重新派生运算符集与引用类型。
 
 ## 布局契约（组内，递归同形）
 

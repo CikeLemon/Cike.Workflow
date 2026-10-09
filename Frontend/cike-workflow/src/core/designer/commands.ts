@@ -224,6 +224,31 @@ export function makeRemoveNodeCommand(parent: NodeContainer, childId: string): (
 }
 
 /**
+ * Multi-node move as ONE command: edge insertion shifts a downstream set
+ * together (ADR 0013). Each move records its own from-position so undo can
+ * restore saved positions and clear never-saved ones.
+ */
+export function makeShiftNodesCommand(
+  moves: Array<{ activity: IActivity; from: DesignerNodeMeta | null; to: DesignerNodeMeta }>,
+): DesignerCommand {
+  return {
+    label: "移位节点",
+    apply: () => {
+      for (const move of moves) setNodePosition(move.activity, move.to);
+    },
+    undo: () => {
+      for (const move of moves) {
+        if (move.from) setNodePosition(move.activity, move.from);
+        else clearNodePosition(move.activity);
+      }
+    },
+    redo: () => {
+      for (const move of moves) setNodePosition(move.activity, move.to);
+    },
+  };
+}
+
+/**
  * Composite command: applies several edits as ONE undoable step. Used to write
  * the condition editing-truth (customProperties) and its compiled expression
  * together, so a single Ctrl+Z reverts both (no half-state).

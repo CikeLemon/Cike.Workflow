@@ -91,6 +91,14 @@ export function getInPortsOf(activity: IActivity): string[] {
   return (activity as Activity).getInPorts().map((port) => port.name);
 }
 
+/** Rendered size of a freshly added node (no saved size yet). */
+export function getDefaultNodeSize(activity: IActivity): { width: number; height: number } {
+  return {
+    width: DEFAULT_NODE_WIDTH,
+    height: computeMinHeight(getInPortsOf(activity).length, getOutPortsOf(activity).length),
+  };
+}
+
 export function canDrillInto(activity: IActivity): boolean {
   if (activity instanceof Flowchart) return true;
   // Generic unknowns are drillable only when their wire JSON was container-like.

@@ -775,3 +775,353 @@ describe("debugRun", () => {
     expect(designer.canDebug.value).toBe(false)
   })
 })
+
+describe("useWorkflowDesigner edge insertion", () => {
+  /** Wide gaps (320px > 180 + 2*40): insertion must not shift anything. */
+  function makeWideDetail() {
+    return {
+      ...makeDetail(),
+      root: {
+        type: "Cike.Flowchart",
+        id: "fc-root",
+        name: "示例流程",
+        activities: [
+          { type: "Cike.Start", id: "a-start", metadata: { designer: { x: 0, y: 0 } } },
+          { type: "Cike.If", id: "a-if", metadata: { designer: { x: 500, y: 0 } } },
+          { type: "Cike.End", id: "a-end", metadata: { designer: { x: 1000, y: 0 } } },
+        ],
+        connections: [
+          { source: { activityId: "a-start" }, target: { activityId: "a-if" } },
+          { source: { activityId: "a-if", port: "True" }, target: { activityId: "a-end" } },
+        ],
+      },
+    }
+  }
+
+  /** Tight gap (20px): insertion must shift the structural downstream. */
+  function makeTightDetail(withTargetPosition: boolean) {
+    const end: Record<string, unknown> = { type: "Cike.End", id: "a-end" }
+    if (withTargetPosition) end.metadata = { designer: { x: 200, y: 0 } }
+    return {
+      ...makeDetail(),
+      root: {
+        type: "Cike.Flowchart",
+        id: "fc-root",
+        name: "示例流程",
+        activities: [
+          { type: "Cike.Start", id: "a-start", metadata: { designer: { x: 0, y: 0 } } },
+          end,
+        ],
+        connections: [{ source: { activityId: "a-start" }, target: { activityId: "a-end" } }],
+      },
+    }
+  }
+
+  /** Cycle n1→n2→n3→n1 with a tight first gap: loop nodes must not shift. */
+  function makeCycleDetail() {
+    return {
+      ...makeDetail(),
+      root: {
+        type: "Cike.Flowchart",
+        id: "fc-root",
+        name: "示例流程",
+        activities: [
+          { type: "Cike.Start", id: "n1", metadata: { designer: { x: 0, y: 0 } } },
+          { type: "Cike.RunJavaScript", id: "n2", metadata: { designer: { x: 200, y: 0 } } },
+          { type: "Cike.RunJavaScript", id: "n3", metadata: { designer: { x: 400, y: 0 } } },
+        ],
+        connections: [
+          { source: { activityId: "n1" }, target: { activityId: "n2" } },
+          { source: { activityId: "n2" }, target: { activityId: "n3" } },
+          { source: { activityId: "n3" }, target: { activityId: "n1" } },
+        ],
+      },
+    }
+  }
+
+  function connectionsOf(designer: ReturnType<typeof useWorkflowDesigner>) {
+    const entry = designer.currentEntry.value!.activity as unknown as {
+      connections: { source: { activityId: string; port?: string }; target: { activityId: string } }[]
+    }
+    return entry.connections.map((c) => `${c.source.activityId}${c.source.port ? `.${c.source.port}` : ""}->${c.target.activityId}`)
+  }
+
+  function positionOf(designer: ReturnType<typeof useWorkflowDesigner>, id: string) {
+    const child = designer.currentChildren.value.find((activity) => activity.id === id) as
+      | { metadata?: { designer?: { x?: number; y?: number } } }
+      | undefined
+    return child?.metadata?.designer ?? null
+  }
+
+  it("Insert_Rewires_PreservesSourcePort_AndUsesFirstOutPort", async () => {
+    getById.mockResolvedValue({ data: makeWideDetail(), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    const ok = designer.insertNodeOnConnection({ source: "a-if", sourcePort: "True", target: "a-end" }, "Cike.RunJavaScript")
+
+    expect(ok).toBe(true)
+    const inserted = designer.currentChildren.value.find((activity) => activity.type === "Cike.RunJavaScript")!
+    expect(connectionsOf(designer).sort()).toEqual(
+      [`a-start->a-if`, `a-if.True->${inserted.id}`, `${inserted.id}.Done->a-end`].sort(),
+    )
+    expect(inserted.nodeId).toBe(`fc-root:${inserted.id}`)
+    expect(designer.selectedActivityId.value).toBe(inserted.id)
+    // Gap was wide enough: nothing moved, new node sits at the shifted-midpoint.
+    expect(positionOf(designer, "a-if")).toEqual({ x: 500, y: 0 })
+    expect(positionOf(designer, "a-end")).toEqual({ x: 1000, y: 0 })
+    expect(positionOf(designer, inserted.id)).toEqual({ x: 750, y: 3 })
+  })
+
+  it("Insert_ShiftsStructuralDownstream_WhenGapTooSmall", async () => {
+    getById.mockResolvedValue({ data: makeTightDetail(true), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    const ok = designer.insertNodeOnConnection({ source: "a-start", target: "a-end" }, "Cike.RunJavaScript")
+
+    expect(ok).toBe(true)
+    const inserted = designer.currentChildren.value.find((activity) => activity.type === "Cike.RunJavaScript")!
+    // delta = (180 + 2*40) - 20 = 240; end 200 → 440; new node centered in the opened gap.
+    expect(positionOf(designer, "a-end")).toEqual({ x: 440, y: 0 })
+    expect(positionOf(designer, inserted.id)).toEqual({ x: 220, y: 0 })
+    expect(connectionsOf(designer).sort()).toEqual([`a-start->${inserted.id}`, `${inserted.id}.Done->a-end`].sort())
+  })
+
+  it("Insert_CycleGuard_LoopNodesNeverShift", async () => {
+    getById.mockResolvedValue({ data: makeCycleDetail(), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    const ok = designer.insertNodeOnConnection({ source: "n1", target: "n2" }, "Cike.RunJavaScript")
+
+    expect(ok).toBe(true)
+    // n2/n3 are RunJavaScript too: the inserted node is the selected one.
+    const insertedId = designer.selectedActivityId.value!
+    // Every node reachable from n2 can flow back to n1, so the shift set is empty.
+    expect(positionOf(designer, "n2")).toEqual({ x: 200, y: 0 })
+    expect(positionOf(designer, "n3")).toEqual({ x: 400, y: 0 })
+    expect(positionOf(designer, insertedId)).toEqual({ x: 100, y: 0 })
+  })
+
+  it("Insert_UndoAndRedo_AreSingleSteps_RestoringPositions", async () => {
+    getById.mockResolvedValue({ data: makeTightDetail(false), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+    // a-end has no saved position: auto-layout puts it at (360, 80); start is
+    // pinned at (0, 0) so the gap is 180 → delta = 260 - 180 = 80.
+    expect(designer.insertNodeOnConnection({ source: "a-start", target: "a-end" }, "Cike.RunJavaScript")).toBe(true)
+    const insertedId = designer.selectedActivityId.value!
+    expect(positionOf(designer, "a-end")).toEqual({ x: 440, y: 80 })
+
+    designer.undo()
+    expect(connectionsOf(designer)).toEqual(["a-start->a-end"])
+    expect(designer.currentChildren.value.map((activity) => activity.id)).not.toContain(insertedId)
+    expect(positionOf(designer, "a-end")).toBeNull()
+
+    designer.redo()
+    expect(designer.currentChildren.value.map((activity) => activity.id)).toContain(insertedId)
+    expect(positionOf(designer, "a-end")).toEqual({ x: 440, y: 80 })
+    expect(connectionsOf(designer).sort()).toEqual([`a-start->${insertedId}`, `${insertedId}.Done->a-end`].sort())
+  })
+
+  it("InsertableGroups_ExcludeTypesWithoutInOrOutPorts", async () => {
+    getDescriptors.mockResolvedValue({
+      data: [
+        { typeName: "Cike.Start", category: "cike" },
+        { typeName: "Cike.End", category: "cike" },
+        { typeName: "Cike.If", category: "branching" },
+        { typeName: "Cike.RunJavaScript", category: "scripting" },
+      ],
+    })
+    getById.mockResolvedValue({ data: makeWideDetail(), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    const typeNames = designer.insertableGroups.value.flatMap((group) => group.items.map((item) => item.typeName))
+    expect(typeNames.sort()).toEqual(["Cike.If", "Cike.RunJavaScript"])
+  })
+
+  it("Insert_RejectsReadonlyVersion", async () => {
+    getById.mockResolvedValue({ data: makeDetail({ id: "90", isLatest: false }), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.viewVersion("90")
+
+    expect(designer.insertNodeOnConnection({ source: "a", target: "b" }, "Cike.RunJavaScript")).toBe(false)
+  })
+
+  it("Insert_RejectsUnknownConnectionAndNonInsertableTypes", async () => {
+    getById.mockResolvedValue({ data: makeWideDetail(), error: undefined })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    expect(designer.insertNodeOnConnection({ source: "a-start", target: "a-end" }, "Cike.RunJavaScript")).toBe(false)
+    expect(designer.insertNodeOnConnection({ source: "a-start", target: "a-if" }, "Cike.Start")).toBe(false)
+    expect(designer.insertNodeOnConnection({ source: "a-start", target: "a-if" }, "Cike.End")).toBe(false)
+    expect(designer.insertNodeOnConnection({ source: "a-start", target: "a-if" }, "Cike.Nope")).toBe(false)
+    expect(connectionsOf(designer)).toEqual(["a-start->a-if", "a-if.True->a-end"])
+  })
+
+  it("Insert_RejectsChainContainerLevel", async () => {
+    getById.mockResolvedValue({
+      data: {
+        ...makeDetail(),
+        root: {
+          type: "Cike.Flowchart",
+          id: "fc-root",
+          name: "示例流程",
+          activities: [
+            {
+              type: "Cike.Sequence",
+              id: "seq",
+              activities: [
+                { type: "Cike.Start", id: "s1" },
+                { type: "Cike.End", id: "e1" },
+              ],
+            },
+          ],
+          connections: [],
+        },
+      },
+      error: undefined,
+    })
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+    const sequence = designer.currentChildren.value.find((activity) => activity.id === "seq")!
+    designer.drillInto(sequence as never)
+
+    expect(designer.insertNodeOnConnection({ source: "s1", target: "e1" }, "Cike.RunJavaScript")).toBe(false)
+  })
+})
+
+describe("useWorkflowDesigner node removal rewire", () => {
+  function mockFlow(activities: unknown[], connections: unknown[]) {
+    getById.mockResolvedValue({
+      data: {
+        ...makeDetail(),
+        root: { type: "Cike.Flowchart", id: "fc-root", name: "示例流程", activities, connections },
+      },
+      error: undefined,
+    })
+  }
+
+  function connectionsOf(designer: ReturnType<typeof useWorkflowDesigner>) {
+    const entry = designer.currentEntry.value!.activity as unknown as {
+      connections: { source: { activityId: string; port?: string }; target: { activityId: string } }[]
+    }
+    return entry.connections.map((c) => `${c.source.activityId}${c.source.port ? `.${c.source.port}` : ""}->${c.target.activityId}`)
+  }
+
+  function idsOf(designer: ReturnType<typeof useWorkflowDesigner>) {
+    return designer.currentChildren.value.map((activity) => activity.id)
+  }
+
+  const linearActivities = [
+    { type: "Cike.Start", id: "a-start" },
+    { type: "Cike.RunJavaScript", id: "a-mid" },
+    { type: "Cike.End", id: "a-end" },
+  ]
+  const linearConnections = [
+    { source: { activityId: "a-start" }, target: { activityId: "a-mid" } },
+    { source: { activityId: "a-mid", port: "Done" }, target: { activityId: "a-end" } },
+  ]
+
+  it("Remove_SingleInSingleOut_RewiresAndDropsDeletedOutPort", async () => {
+    mockFlow(linearActivities, linearConnections)
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    designer.removeNode("a-mid")
+
+    expect(idsOf(designer)).not.toContain("a-mid")
+    // Rewire keeps the inbound source (a-start, no port); the deleted node's own
+    // out port (Done) is dropped — the exact inverse of insertion (ADR 0013).
+    expect(connectionsOf(designer)).toEqual(["a-start->a-end"])
+  })
+
+  it("Remove_SingleInSingleOut_PreservesInboundSourcePort", async () => {
+    mockFlow(
+      [
+        { type: "Cike.Start", id: "a-start" },
+        { type: "Cike.If", id: "a-if" },
+        { type: "Cike.RunJavaScript", id: "a-mid" },
+        { type: "Cike.End", id: "a-end" },
+      ],
+      [
+        { source: { activityId: "a-start" }, target: { activityId: "a-if" } },
+        { source: { activityId: "a-if", port: "True" }, target: { activityId: "a-mid" } },
+        { source: { activityId: "a-mid", port: "Done" }, target: { activityId: "a-end" } },
+      ],
+    )
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    designer.removeNode("a-mid")
+
+    // The inbound branch port (If.True) survives; only a-mid's own port is lost.
+    expect(connectionsOf(designer).sort()).toEqual(["a-start->a-if", "a-if.True->a-end"].sort())
+  })
+
+  it("Remove_MultiOut_StripsAllConnections_NoRewire", async () => {
+    mockFlow(
+      [
+        { type: "Cike.Start", id: "a-start" },
+        { type: "Cike.If", id: "a-if" },
+        { type: "Cike.End", id: "a-end1" },
+        { type: "Cike.End", id: "a-end2" },
+      ],
+      [
+        { source: { activityId: "a-start" }, target: { activityId: "a-if" } },
+        { source: { activityId: "a-if", port: "True" }, target: { activityId: "a-end1" } },
+        { source: { activityId: "a-if", port: "False" }, target: { activityId: "a-end2" } },
+      ],
+    )
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    designer.removeNode("a-if")
+
+    expect(idsOf(designer)).not.toContain("a-if")
+    // Two out-edges: branch intent is unknowable, so strip all and let canvas
+    // validation surface the gap (ADR 0013 symmetry).
+    expect(connectionsOf(designer)).toEqual([])
+  })
+
+  it("Remove_SingleInSingleOut_UndoRedoIsSingleStep", async () => {
+    mockFlow(linearActivities, linearConnections)
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    designer.removeNode("a-mid")
+    expect(connectionsOf(designer)).toEqual(["a-start->a-end"])
+
+    designer.undo()
+    expect(idsOf(designer)).toContain("a-mid")
+    expect(connectionsOf(designer).sort()).toEqual(["a-start->a-mid", "a-mid.Done->a-end"].sort())
+
+    designer.redo()
+    expect(idsOf(designer)).not.toContain("a-mid")
+    expect(connectionsOf(designer)).toEqual(["a-start->a-end"])
+  })
+
+  it("Remove_SelfLoop_SingleInSingleOut_NoRewire", async () => {
+    mockFlow(
+      [
+        { type: "Cike.RunJavaScript", id: "n1" },
+        { type: "Cike.RunJavaScript", id: "n2" },
+      ],
+      [
+        { source: { activityId: "n1" }, target: { activityId: "n2" } },
+        { source: { activityId: "n2", port: "Done" }, target: { activityId: "n1" } },
+      ],
+    )
+    const designer = useWorkflowDesigner()
+    await designer.load("100")
+
+    designer.removeNode("n2")
+
+    // source (n1) === target (n1): a self-loop carries no rewire intent.
+    expect(idsOf(designer)).not.toContain("n2")
+    expect(connectionsOf(designer)).toEqual([])
+  })
+})
