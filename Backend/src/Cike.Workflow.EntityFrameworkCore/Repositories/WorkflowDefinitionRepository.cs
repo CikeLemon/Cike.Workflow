@@ -76,13 +76,15 @@ public class WorkflowDefinitionRepository(CikeWorkflowDbContext context, IPayloa
         return await FindAsync(rowId, cancellationToken);
     }
 
-    public async Task<Dictionary<string, int>> GetPublishedVersionMapAsync(IReadOnlyCollection<string> definitionIds, CancellationToken cancellationToken = default)
+    public async Task<Dictionary<string, (long Id, int Version)>> GetPublishedVersionMapAsync(IReadOnlyCollection<string> definitionIds, CancellationToken cancellationToken = default)
     {
-        return await GetQueryable().AsNoTracking()
+        var rows = await GetQueryable().AsNoTracking()
             .Where(x => x.IsPublished && definitionIds.Contains(x.DefinitionId))
             .GroupBy(x => x.DefinitionId)
-            .Select(g => new { g.Key, Version = g.Max(x => x.Version) })
-            .ToDictionaryAsync(x => x.Key, x => x.Version, cancellationToken);
+            .Select(g => g.OrderByDescending(x => x.Version).First())
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(x => x.DefinitionId, x => (Id: x.Id, Version: x.Version));
     }
 
     public async Task<Dictionary<long, string>> GetNamesByIdsAsync(IReadOnlyCollection<long> versionIds, CancellationToken cancellationToken = default)

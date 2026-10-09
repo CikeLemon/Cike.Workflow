@@ -13,9 +13,10 @@ public interface IWorkflowDefinitionRepository : IRepository<WorkflowDefinition,
     Task<WorkflowDefinition?> FindWorkflowDefinitionAsync(string definitionId, VersionOptions versionOptions, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 批量取各定义已发布的最高版本号（数据库端 GroupBy Max）：未发布草稿要展示"当前已发布版本"时用。
+    /// 批量取各定义已发布的最高版本行（数据库端 GroupBy，行 Id + 版本号）：
+    /// 未发布草稿要展示"当前已发布版本"及其版本行 Id 时用，未发布过的定义不在结果中。
     /// </summary>
-    Task<Dictionary<string, int>> GetPublishedVersionMapAsync(IReadOnlyCollection<string> definitionIds, CancellationToken cancellationToken = default);
+    Task<Dictionary<string, (long Id, int Version)>> GetPublishedVersionMapAsync(IReadOnlyCollection<string> definitionIds, CancellationToken cancellationToken = default);
 
     /// <summary>按版本行 Id 批量取行名称（数据库端投影）。</summary>
     Task<Dictionary<long, string>> GetNamesByIdsAsync(IReadOnlyCollection<long> versionIds, CancellationToken cancellationToken = default);

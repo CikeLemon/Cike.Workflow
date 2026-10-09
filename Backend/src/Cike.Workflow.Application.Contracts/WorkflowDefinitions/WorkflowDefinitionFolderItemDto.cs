@@ -46,6 +46,9 @@ public class WorkflowDefinitionItemDto : WorkflowDefinitionFolderBaseDto
 
     public int? PublishedVersion { get; set; }
 
+    /// <summary>最新已发布版本的行 Id，从未发布过为 null（HTTP 序列化为 "0"）。</summary>
+    public long? PublishedVersionId { get; set; }
+
     public bool IsReadonly { get; set; }
 
     public bool IsSystem { get; set; }

@@ -3,6 +3,7 @@ using Cike.EventBus.Local;
 using Cike.Workflow.Application.Contracts.WorkflowDefinitions;
 using Cike.Workflow.Application.WorkflowDefinitions.Commands;
 using Cike.Workflow.Application.WorkflowDefinitions.Queries;
+using Cike.Workflow.Domain.Shared.ValueObjects;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
@@ -51,6 +52,17 @@ public class WorkflowDefinitionService : MinimalApiServiceBase
         CancellationToken cancellationToken = default)
     {
         var query = new GetWorkflowDefinitionVersionListQuery(definitionId);
+        await localEventBus.PublishAsync(query, cancellationToken);
+        return TypedResults.Ok(query.Result);
+    }
+
+    /// <summary>按版本行 Id 取该版本的 Options（输入参数定义等全量配置）。</summary>
+    public async Task<Results<Ok<WorkflowDefinitionOptionsValueObject>, BadRequest>> GetVersionOptionsAsync(
+        [FromServices] ILocalEventBus localEventBus,
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new GetWorkflowDefinitionOptionsQuery(id);
         await localEventBus.PublishAsync(query, cancellationToken);
         return TypedResults.Ok(query.Result);
     }

@@ -28,7 +28,7 @@ public class WorkflowDefinitionQueryHandler(ICacheService<FolderCacheModel> fold
         var draftDefinitionIds = latestWorkflows.Where(x => !x.IsPublished).Select(x => x.DefinitionId).ToList();
         var publishedVersionMap = draftDefinitionIds.Count > 0
             ? await workflowDefinitionRepository.GetPublishedVersionMapAsync(draftDefinitionIds, cancellationToken)
-            : new Dictionary<string, int>();
+            : new Dictionary<string, (long Id, int Version)>();
 
         query.Result = new List<WorkflowDefinitionFolderItemDto>();
         foreach (var item in allFolders.AsQueryable().OrderBy(query.Sorting))
@@ -45,7 +45,12 @@ public class WorkflowDefinitionQueryHandler(ICacheService<FolderCacheModel> fold
         foreach (var item in latestWorkflows)
         {
             var data = item.Adapt<WorkflowDefinitionItemDto>();
-            data.PublishedVersion = item.IsPublished ? item.Version : publishedVersionMap.GetValueOrDefault(item.DefinitionId);
+            // 未发布的定义不在 map 中：元组默认值 (0, 0)，行 Id 为雪花 Id 不会是 0，0 即"从未发布"
+            var (publishedId, publishedVersion) = item.IsPublished
+                ? (Id: item.Id, Version: item.Version)
+                : publishedVersionMap.GetValueOrDefault(item.DefinitionId);
+            data.PublishedVersion = publishedVersion;
+            data.PublishedVersionId = publishedId == 0 ? null : publishedId;
             query.Result.Add(new WorkflowDefinitionFolderItemDto
             {
                 Id = item.Id,
@@ -88,6 +93,14 @@ public class WorkflowDefinitionQueryHandler(ICacheService<FolderCacheModel> fold
             x => x.DefinitionId == query.DefinitionId, "Version desc", cancellationToken);
 
         query.Result = versions.Adapt<List<WorkflowDefinitionVersionItemDto>>();
+    }
+
+    /// <summary>按版本行 Id 取该版本 Options：跟踪条目上影子属性才可读（OnLoadAsync 还原），与 GetAsync 同源纪律。</summary>
+    [LocalEventHandler]
+    public async Task GetVersionOptionsAsync(GetWorkflowDefinitionOptionsQuery query, CancellationToken cancellationToken)
+    {
+        var entity = await workflowDefinitionRepository.GetAsync(query.Id, cancellationToken);
+        query.Result = entity.Options;
     }
 
     [LocalEventHandler]

@@ -119,4 +119,51 @@ public class WorkflowDefinitionRepositoryTest : RepositoryTestBase
         Assert.That(restored, Is.Not.Null);
         Assert.That(restored!.Options, Is.Not.Null);
     }
+
+    [Test]
+    public async Task GetPublishedVersionMapAsync_WithMultiplePublishedRows_ReturnsLatestPublishedRowPerDefinition()
+    {
+        long publishedRowId;
+        using (var scope = CreateScope())
+        {
+            var repository = scope.ServiceProvider.GetRequiredService<IWorkflowDefinitionRepository>();
+            // 同一定义两个已发布版本行：最高版本（v2）应胜出
+            var v1 = MakeDefinition("pub-multi");
+            v1.Version = 1;
+            v1.IsLatest = false;
+            v1.IsPublished = true;
+            var v2 = MakeDefinition("pub-multi");
+            v2.Version = 2;
+            v2.IsPublished = true;
+            // 另一定义仅有草稿，不应出现在 map 中
+            var draft = MakeDefinition("pub-draft");
+
+            await repository.InsertManyAsync([v1, v2, draft]);
+            publishedRowId = v2.Id;
+        }
+
+        var map = await WithScopeAsync(sp => sp.GetRequiredService<IWorkflowDefinitionRepository>()
+            .GetPublishedVersionMapAsync(["WF_pub-multi", "WF_pub-draft"]));
+
+        Assert.That(map, Has.Count.EqualTo(1));
+        Assert.That(map.ContainsKey("WF_pub-multi"), Is.True);
+        Assert.That(map["WF_pub-multi"].Id, Is.EqualTo(publishedRowId));
+        Assert.That(map["WF_pub-multi"].Version, Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task GetPublishedVersionMapAsync_WhenNoDefinitionPublished_ReturnsEmptyMap()
+    {
+        using (var scope = CreateScope())
+        {
+            var repository = scope.ServiceProvider.GetRequiredService<IWorkflowDefinitionRepository>();
+            var draft = MakeDefinition("pub-none");
+            await repository.InsertAsync(draft);
+        }
+
+        var map = await WithScopeAsync(sp => sp.GetRequiredService<IWorkflowDefinitionRepository>()
+            .GetPublishedVersionMapAsync(["WF_pub-none"]));
+
+        Assert.That(map, Is.Empty);
+    }
 }
